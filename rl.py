@@ -11,8 +11,8 @@ class Object:
             self.char = "[color={}]{}".format(color, char)
 
     def move(self, dx, dy):
-        if w_width > self.x + dx >= 0 and \
-           w_height > self.y + dy >= 0 and \
+        if window_width > self.x + dx >= 0 and \
+           window_height > self.y + dy >= 0 and \
            not dgn_layout[self.x + dx][self.y + dy].opacity:
             self.x += dx
             self.y += dy
@@ -21,13 +21,19 @@ class Object:
             return False
 
 class Tile:
-    def __init__(self, blocked, opacity=False):
+    def __init__(self, x, y, char, blocked, opacity=False):
+        self.x = x
+        self.y = y
+        self.char = char
         if not opacity:
             opacity = blocked
         self.opacity = opacity
 
-w_width = 64
-w_height = 36
+window_width = 96
+window_height = 54
+screen_width = 64
+screen_height = 36
+
 cellsize = "12x12"
 redhat = "[+][color=red][offset=0,0]^"
 dgn_layout = []
@@ -35,37 +41,37 @@ dgn_layout = []
 def main():
     blt.open_()
     blt.set_("window: size={}x{}, cellsize={}, title='Omni: menu';"
-             "font: default".format(str(w_width), str(w_height), cellsize))
+             "font: default".format(str(window_width), str(window_height), cellsize))
     blt.clear()
     blt.refresh()
     blt.color("white")
-    p = Object(0, 0, "@",)
+    p = Object(15, 15, "@",)
 
     def make_map():
-        temp = [[Tile(False)
-            for y in range(w_height)]
-                for x in range(w_width)]
-        for y in range(10):
-            y += 10
-            temp[10][y].opacity = True
+        temp = [[Tile(x, y, '[color=amber].', False)
+            for y in range(window_height)]
+                for x in range(window_width)]
+        for y in range(6):
+            y += 5
+            temp[5][y].opacity = True
+            temp[5][y].char = "[color=dark orange]#"
         return temp
+
     global dgn_layout
     dgn_layout = make_map()
 
-    def render_all():
-        for y in range(w_height):
-            for x in range(w_width):
-                wall = dgn_layout[x][y].opacity
-                if wall:
-                    blt.print_(x, y, "[color=dark orange]#")
-                else:
-                    blt.layer(0)
-                    blt.print_(x, y, "[color=light amber][offset=0, -3].")
-                    blt.layer(1)
+    def render_all(map_, offset, screen_size):
+        off_x, off_y = offset
+        size_w, size_h = screen_size
+        for col, column in enumerate(map_):
+            if off_x <= col <= off_x+size_w:
+                for row, tile in enumerate(column):
+                    if off_y <= row <= off_y+size_h:
+                        blt.print_(tile.x+off_x, tile.y+off_y, tile.char)
         blt.print_(p.x, p.y, p.char)
 
     blt.layer(1)
-    render_all()
+    render_all(dgn_layout, (0, 0), (screen_width, screen_height))
     proceed = True
     while proceed:
         blt.clear()
@@ -92,10 +98,9 @@ def main():
                 p.move(1, 1)
             elif key == blt.TK_A:
                 p.char += redhat
-            elif key == blt.TK_B:
-                print(blt.state(blt.TK_LAYER))
+            elif key == blt.TK_S:
                 p.char = p.init_char
-        render_all()
+        render_all(dgn_layout, (0, 0), (screen_width, screen_height))
         blt.refresh()
 
     blt.close()
