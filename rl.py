@@ -1,38 +1,55 @@
 import PyBearLibTerminal as blt
 from Thing import Character, Tile
 
-window_width = 96
-window_height = 54
-screen_width = 64
-screen_height = 36
+window_width = 64
+window_height = 36
+screen_width = 48
+screen_height = 27
 
-cellsize = "12x12"
+cellsize = "16x16"
 redhat = "[+][color=red][offset=0,0]^"
 
 def make_map():
     temp = [[Tile(x, y, '.', "amber", False)
         for y in range(window_height)]
             for x in range(window_width)]
-    for y in range(6):
-        y += 5
-        temp[5][y].invisible = True
-        temp[5][y].raw_char = "#"
-        temp[5][y].color = "[color=dark orange]"
-        temp[5][y].update_char()
     return temp
 
-def render_all(map_, current_flooroor_objs, offset, screen_size):
+def display_character_info(character):
+    global screen_width, screen_height
+    x = screen_width+1
+    blt.print_(x, 2, "Name:   {}".format(character.name))
+    blt.print_(x, 3, "Health: [color=red]{}".format(character.health))
+    blt.print_(x, 4, "Mana:   [color=light blue]{}".format(character.mana))
+
+def render_all(character, current_floor, current_floor_objs, offset):
+    render_main_window(current_floor, current_floor_objs, offset)
+    display_character_info(character)
+
+def render_main_window(current_floor, current_floor_objs, offset):
+    global screen_width, screen_height
     off_x, off_y = offset
-    size_w, size_h = screen_size
-    for col, column in enumerate(map_):
+    size_w, size_h = screen_width, screen_height
+    for col, column in enumerate(current_floor):
         if off_x <= col <= off_x+size_w:
             for row, tile in enumerate(column):
                 if off_y <= row <= off_y+size_h:
                     tile.update_char()
                     blt.print_(tile.x+off_x, tile.y+off_y, tile.char)
-    for obj in current_flooroor_objs:
+    for obj in current_floor_objs:
         obj.update_char()
         blt.print_(obj.x, obj.y, obj.char)
+
+def move_character(current_floor, character, direction):
+    global window_width, window_height, screen_width, screen_height
+    dx, dy = character.x+direction[0], character.y+direction[1]
+    x, y = direction
+    if not current_floor[dx][dy].invisible and \
+            screen_width >= dx >= 0 and screen_height >= dy >= 0:
+        character.move(x, y)
+        return True
+    else:
+        return False
 
 def main():
     blt.open_()
@@ -41,14 +58,13 @@ def main():
     blt.clear()
     blt.refresh()
     blt.color("white")
-    p = Character(15, 15, "@", "white")
+    p = Character(6, 6, "Butts", "@", "white")
 
     current_floor = make_map()
     current_floor_objs = []
     current_floor_objs.append(p)
 
-    blt.layer(1)
-    render_all(current_floor, current_floor_objs, (0, 0), (screen_width, screen_height))
+    render_all(p, current_floor, current_floor_objs, (0, 0))
     proceed = True
     while proceed:
         blt.clear()
@@ -58,26 +74,26 @@ def main():
             if key == blt.TK_CLOSE or key == blt.TK_ESCAPE:
                 proceed = False
             elif key == blt.TK_K:
-                p.move(0, -1)
+                move_character(current_floor, p, (0, -1))
             elif key == blt.TK_J:
-                p.move(0, 1)
+                move_character(current_floor, p, (0, 1))
             elif key == blt.TK_H:
-                p.move(-1, 0)
+                move_character(current_floor, p, (-1, 0))
             elif key == blt.TK_L:
-                p.move(1, 0)
+                move_character(current_floor, p, (1, 0))
             elif key == blt.TK_Y:
-                p.move(-1, -1)
+                move_character(current_floor, p, (-1, -1))
             elif key == blt.TK_U:
-                p.move(1, -1)
+                move_character(current_floor, p, (1, -1))
             elif key == blt.TK_B:
-                p.move(-1, 1)
+                move_character(current_floor, p, (-1, 1))
             elif key == blt.TK_N:
-                p.move(1, 1)
+                move_character(current_floor, p, (1, 1))
             elif key == blt.TK_A:
-                p.attributes.add(redhat)
+                p.apparel.add(redhat)
             elif key == blt.TK_S:
-                p.attributes.discard(redhat)
-        render_all(current_floor, current_floor_objs, (0, 0), (screen_width, screen_height))
+                p.apparel.discard(redhat)
+        render_all(p, current_floor, current_floor_objs, (0, 0))
         blt.refresh()
 
     blt.close()

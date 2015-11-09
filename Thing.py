@@ -4,14 +4,20 @@ class Thing:
         self.y = y
         self.raw_char = char
         self.color = "[color={}]".format(color)
-        self.attributes = set()
+        self.apparel = set()
         self.update_char()
 
     def update_char(self):
-        ups = [self.color + self.raw_char] + [x for x in self.attributes]
-        self.char = "".join(x for x in ups)
+        elements = [self.color + self.raw_char] + [x for x in self.apparel]
+        self.char = "".join(e for e in elements)
 
 class Character(Thing):
+    def __init__(self, x, y, name, char, color):
+        super().__init__(x, y, char, color)
+        self.name = name
+        self.health = 20
+        self.mana = 10
+        self.attack = 2
 
     def move(self, dx, dy):
         self.x += dx
@@ -22,5 +28,5 @@ class Tile(Thing):
         super().__init__(x, y, char, color)
         if not invisible:
             invisible = physical
+        self.physical = physical
         self.invisible = invisible
-
