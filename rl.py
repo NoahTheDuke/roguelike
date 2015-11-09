@@ -1,33 +1,5 @@
 import PyBearLibTerminal as blt
-
-class Object:
-    def __init__(self, x, y, char, color=None):
-        self.x = x
-        self.y = y
-        self.char = char
-        self.init_char = char
-        self.color = color
-        if color:
-            self.char = "[color={}]{}".format(color, char)
-
-    def move(self, dx, dy):
-        if window_width > self.x + dx >= 0 and \
-           window_height > self.y + dy >= 0 and \
-           not dgn_layout[self.x + dx][self.y + dy].opacity:
-            self.x += dx
-            self.y += dy
-            return True
-        else:
-            return False
-
-class Tile:
-    def __init__(self, x, y, char, blocked, opacity=False):
-        self.x = x
-        self.y = y
-        self.char = char
-        if not opacity:
-            opacity = blocked
-        self.opacity = opacity
+from Thing import Character, Tile
 
 window_width = 96
 window_height = 54
@@ -36,7 +8,31 @@ screen_height = 36
 
 cellsize = "12x12"
 redhat = "[+][color=red][offset=0,0]^"
-dgn_layout = []
+
+def make_map():
+    temp = [[Tile(x, y, '.', "amber", False)
+        for y in range(window_height)]
+            for x in range(window_width)]
+    for y in range(6):
+        y += 5
+        temp[5][y].invisible = True
+        temp[5][y].raw_char = "#"
+        temp[5][y].color = "[color=dark orange]"
+        temp[5][y].update_char()
+    return temp
+
+def render_all(map_, current_flooroor_objs, offset, screen_size):
+    off_x, off_y = offset
+    size_w, size_h = screen_size
+    for col, column in enumerate(map_):
+        if off_x <= col <= off_x+size_w:
+            for row, tile in enumerate(column):
+                if off_y <= row <= off_y+size_h:
+                    tile.update_char()
+                    blt.print_(tile.x+off_x, tile.y+off_y, tile.char)
+    for obj in current_flooroor_objs:
+        obj.update_char()
+        blt.print_(obj.x, obj.y, obj.char)
 
 def main():
     blt.open_()
@@ -45,33 +41,14 @@ def main():
     blt.clear()
     blt.refresh()
     blt.color("white")
-    p = Object(15, 15, "@",)
+    p = Character(15, 15, "@", "white")
 
-    def make_map():
-        temp = [[Tile(x, y, '[color=amber].', False)
-            for y in range(window_height)]
-                for x in range(window_width)]
-        for y in range(6):
-            y += 5
-            temp[5][y].opacity = True
-            temp[5][y].char = "[color=dark orange]#"
-        return temp
-
-    global dgn_layout
-    dgn_layout = make_map()
-
-    def render_all(map_, offset, screen_size):
-        off_x, off_y = offset
-        size_w, size_h = screen_size
-        for col, column in enumerate(map_):
-            if off_x <= col <= off_x+size_w:
-                for row, tile in enumerate(column):
-                    if off_y <= row <= off_y+size_h:
-                        blt.print_(tile.x+off_x, tile.y+off_y, tile.char)
-        blt.print_(p.x, p.y, p.char)
+    current_floor = make_map()
+    current_floor_objs = []
+    current_floor_objs.append(p)
 
     blt.layer(1)
-    render_all(dgn_layout, (0, 0), (screen_width, screen_height))
+    render_all(current_floor, current_floor_objs, (0, 0), (screen_width, screen_height))
     proceed = True
     while proceed:
         blt.clear()
@@ -97,10 +74,10 @@ def main():
             elif key == blt.TK_N:
                 p.move(1, 1)
             elif key == blt.TK_A:
-                p.char += redhat
+                p.attributes.add(redhat)
             elif key == blt.TK_S:
-                p.char = p.init_char
-        render_all(dgn_layout, (0, 0), (screen_width, screen_height))
+                p.attributes.discard(redhat)
+        render_all(current_floor, current_floor_objs, (0, 0), (screen_width, screen_height))
         blt.refresh()
 
     blt.close()
