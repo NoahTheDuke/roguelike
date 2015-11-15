@@ -1,10 +1,12 @@
 class Thing:
-    def __init__(self, x, y, char, color):
+    def __init__(self, x, y, char, color, physical, invisible=False):
         self.x = x
         self.y = y
         self.raw_char = char
         self.color = "[color={}]".format(color)
         self.apparel = set()
+        self.physical = physical
+        self.invisible = invisible
         self.update_char()
 
     def update_char(self):
@@ -12,8 +14,8 @@ class Thing:
         self.char = "".join(e for e in elements)
 
 class Character(Thing):
-    def __init__(self, x, y, name, char, color):
-        super().__init__(x, y, char, color)
+    def __init__(self, x, y, name, char, color, physical, invisible=False):
+        super().__init__(x, y, char, color, physical, invisible)
         self.name = name
         self.health = 20
         self.mana = 10
@@ -25,8 +27,6 @@ class Character(Thing):
 
 class Tile(Thing):
     def __init__(self, x, y, char, color, physical, invisible=False):
-        super().__init__(x, y, char, color)
+        super().__init__(x, y, char, color, physical, invisible)
         if not invisible:
             invisible = physical
-        self.physical = physical
-        self.invisible = invisible

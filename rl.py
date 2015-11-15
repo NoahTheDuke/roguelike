@@ -3,7 +3,7 @@ from Thing import Character, Tile
 
 window_width = 64
 window_height = 36
-screen_width = 48
+screen_width = 40
 screen_height = 27
 
 cellsize = "16x16"
@@ -14,13 +14,6 @@ def make_map():
         for y in range(window_height)]
             for x in range(window_width)]
     return temp
-
-def display_character_info(character):
-    global screen_width, screen_height
-    x = screen_width+1
-    blt.print_(x, 2, "Name:   {}".format(character.name))
-    blt.print_(x, 3, "Health: [color=red]{}".format(character.health))
-    blt.print_(x, 4, "Mana:   [color=light blue]{}".format(character.mana))
 
 def render_all(character, current_floor, current_floor_objs, offset):
     render_main_window(current_floor, current_floor_objs, offset)
@@ -36,9 +29,16 @@ def render_main_window(current_floor, current_floor_objs, offset):
                 if off_y <= row <= off_y+size_h:
                     tile.update_char()
                     blt.print_(tile.x+off_x, tile.y+off_y, tile.char)
-    for obj in current_floor_objs:
-        obj.update_char()
-        blt.print_(obj.x, obj.y, obj.char)
+    for obj in current_floor_objs["Player"]:
+        if obj.invisible is not True:
+            blt.print_(obj.x, obj.y, obj.char)
+
+def display_character_info(character):
+    global screen_width, screen_height
+    loc = screen_width+1
+    blt.print_(loc, 2, "Name:   {}".format(character.name))
+    blt.print_(loc, 3, "Health: [color=red]{}".format(character.health))
+    blt.print_(loc, 4, "Mana:   [color=light blue]{}".format(character.mana))
 
 def move_character(current_floor, character, direction):
     global window_width, window_height, screen_width, screen_height
@@ -51,6 +51,9 @@ def move_character(current_floor, character, direction):
     else:
         return False
 
+def look():
+    return
+
 def main():
     blt.open_()
     blt.set_("window: size={}x{}, cellsize={}, title='Omni: menu';"
@@ -58,42 +61,49 @@ def main():
     blt.clear()
     blt.refresh()
     blt.color("white")
-    p = Character(6, 6, "Butts", "@", "white")
+    pc = Character(6, 6, "Butts", "@", "white", True, False)
+    look_char = Character(6, 6, "Look", "X", "purple", True, True)
 
     current_floor = make_map()
-    current_floor_objs = []
-    current_floor_objs.append(p)
+    current_floor_objs = {}
+    current_floor_objs["Player"] = []
+    current_floor_objs["Player"].append(pc)
+    current_floor_objs["Player"].append(look_char)
 
-    render_all(p, current_floor, current_floor_objs, (0, 0))
+    render_all(pc, current_floor, current_floor_objs, (0, 0))
     proceed = True
     while proceed:
         blt.clear()
         key = 0
-        while proceed and blt.has_input():
+        while blt.has_input():
             key = blt.read()
             if key == blt.TK_CLOSE or key == blt.TK_ESCAPE:
                 proceed = False
             elif key == blt.TK_K:
-                move_character(current_floor, p, (0, -1))
+                move_character(current_floor, pc, (0, -1))
             elif key == blt.TK_J:
-                move_character(current_floor, p, (0, 1))
+                move_character(current_floor, pc, (0, 1))
             elif key == blt.TK_H:
-                move_character(current_floor, p, (-1, 0))
+                move_character(current_floor, pc, (-1, 0))
             elif key == blt.TK_L:
-                move_character(current_floor, p, (1, 0))
+                move_character(current_floor, pc, (1, 0))
             elif key == blt.TK_Y:
-                move_character(current_floor, p, (-1, -1))
+                move_character(current_floor, pc, (-1, -1))
             elif key == blt.TK_U:
-                move_character(current_floor, p, (1, -1))
+                move_character(current_floor, pc, (1, -1))
             elif key == blt.TK_B:
-                move_character(current_floor, p, (-1, 1))
+                move_character(current_floor, pc, (-1, 1))
             elif key == blt.TK_N:
-                move_character(current_floor, p, (1, 1))
+                move_character(current_floor, pc, (1, 1))
             elif key == blt.TK_A:
-                p.apparel.add(redhat)
+                pc.apparel.add(redhat)
+                pc.update_char()
             elif key == blt.TK_S:
-                p.apparel.discard(redhat)
-        render_all(p, current_floor, current_floor_objs, (0, 0))
+                pc.apparel.discard(redhat)
+                pc.update_char()
+            elif key == blt.TK_X:
+                look()
+        render_all(pc, current_floor, current_floor_objs, (0, 0))
         blt.refresh()
 
     blt.close()
