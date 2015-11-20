@@ -12,9 +12,6 @@ terminal.refresh()
 terminal.color("white")
 
 test = []
-for x in it.zip_longest('WGET', 'black', fillvalue=' '):
-    test.append("[+]".join(x))
-    print(test)
 proceed = True
 while proceed:
     n = terminal.printf(1, 1, "[color=orange]1.[/color] Wide color range: ")
@@ -24,7 +21,7 @@ while proceed:
         factor = i/long_word_len
         red = (1 - factor) * 255
         green = factor * 255
-        terminal.color(terminal.color_from_argb(255, red, green, 0))
+        terminal.color(terminal.color_from_argb(255, int(red), int(green), 0))
         terminal.put(1+n+i, 1, long_word[i])
 
     terminal.color("white")

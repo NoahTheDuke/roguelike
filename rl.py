@@ -1,48 +1,56 @@
 import PyBearLibTerminal as blt
-from Thing import Character, Tile
+from Thing import Actor, Tile
 
-window_width = 64
-window_height = 36
-screen_width = 40
-screen_height = 27
+window_width = 80
+window_height = 45
+screen_width = 58
+screen_height = 36
 
-cellsize = "16x16"
+cellsize = "12x12"
 redhat = "[+][color=red][offset=0,0]^"
 
 def make_map():
-    temp = [[Tile(x, y, '.', "amber", False)
-        for y in range(window_height)]
-            for x in range(window_width)]
+    temp = [[Tile(x, y, 1, '.', 'amber', False)
+        for y in range(window_height * 2)]
+            for x in range(window_width * 2)]
     return temp
 
-def render_all(character, current_floor, current_floor_objs, offset):
-    render_main_window(current_floor, current_floor_objs, offset)
-    display_character_info(character)
+def render_all(current_floor, current_floor_objs, selection, offset):
+    render_viewport(current_floor, current_floor_objs, offset)
+    render_sidebar(selection)
+    render_message_bar()
 
-def render_main_window(current_floor, current_floor_objs, offset):
+def render_viewport(current_floor, current_floor_objs, offset):
     global screen_width, screen_height
     off_x, off_y = offset
     size_w, size_h = screen_width, screen_height
     for col, column in enumerate(current_floor):
-        if off_x <= col <= off_x+size_w:
+        if off_x <= col <= off_x + size_w:
             for row, tile in enumerate(column):
-                if off_y <= row <= off_y+size_h:
+                if off_y <= row <= off_y + size_h:
                     tile.update_char()
-                    blt.print_(tile.x+off_x, tile.y+off_y, tile.char)
-    for obj in current_floor_objs["Player"]:
+                    blt.print_(tile.x + off_x, tile.y + off_y, tile.char)
+    for key, obj in current_floor_objs.items():
         if obj.invisible is not True:
             blt.print_(obj.x, obj.y, obj.char)
 
-def display_character_info(character):
+def render_sidebar(character):
     global screen_width, screen_height
-    loc = screen_width+1
-    blt.print_(loc, 2, "Name:   {}".format(character.name))
-    blt.print_(loc, 3, "Health: [color=red]{}".format(character.health))
-    blt.print_(loc, 4, "Mana:   [color=light blue]{}".format(character.mana))
+    loc = screen_width + 1
+    if character:
+        blt.print_(loc, 2, "Name:   {}".format(character.name))
+        blt.print_(loc, 3, "Health: [color=red]{}".format(character.health))
+        blt.print_(loc, 4, "Mana:   [color=lighter blue]{}".format(character.mana))
+    else:
+        blt.print_(loc, 2, "Nothing selected.")
+
+def render_message_bar():
+    global screen_width, screen_height
+    return
 
 def move_character(current_floor, character, direction):
     global window_width, window_height, screen_width, screen_height
-    dx, dy = character.x+direction[0], character.y+direction[1]
+    dx, dy = character.x + direction[0], character.y + direction[1]
     x, y = direction
     if not current_floor[dx][dy].invisible and \
             screen_width >= dx >= 0 and screen_height >= dy >= 0:
@@ -54,30 +62,33 @@ def move_character(current_floor, character, direction):
 def look():
     return
 
+def generate_characters():
+    return
+
 def main():
+    global window_width, window_height, screen_width, screen_height, cellsize
     blt.open_()
-    blt.set_("window: size={}x{}, cellsize={}, title='Omni: menu';"
+    blt.set_("window: size={}x{}, cellsize={}, title='Roguelike';"
              "font: default".format(str(window_width), str(window_height), cellsize))
     blt.clear()
     blt.refresh()
     blt.color("white")
-    pc = Character(6, 6, "Butts", "@", "white", True, False)
-    look_char = Character(6, 6, "Look", "X", "purple", True, True)
+
+    pc = Actor(6, 6, 1, "Butts", "@", "white", True, False)
+    offset = (0, 0)
 
     current_floor = make_map()
     current_floor_objs = {}
-    current_floor_objs["Player"] = []
-    current_floor_objs["Player"].append(pc)
-    current_floor_objs["Player"].append(look_char)
+    current_floor_objs[pc.uuid] = pc
 
-    render_all(pc, current_floor, current_floor_objs, (0, 0))
+    render_all(current_floor, current_floor_objs, None, offset)
     proceed = True
     while proceed:
         blt.clear()
         key = 0
         while blt.has_input():
             key = blt.read()
-            if key == blt.TK_CLOSE or key == blt.TK_ESCAPE:
+            if key == blt.TK_CLOSE or key == blt.TK_Q:
                 proceed = False
             elif key == blt.TK_K:
                 move_character(current_floor, pc, (0, -1))
@@ -103,7 +114,7 @@ def main():
                 pc.update_char()
             elif key == blt.TK_X:
                 look()
-        render_all(pc, current_floor, current_floor_objs, (0, 0))
+        render_all(current_floor, current_floor_objs, None, offset)
         blt.refresh()
 
     blt.close()

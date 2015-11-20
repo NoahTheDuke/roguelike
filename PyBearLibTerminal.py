@@ -192,7 +192,7 @@ def color_from_argb(a, r, g, b):
     result = result * 256 + r
     result = result * 256 + g
     result = result * 256 + b
-    return int(result)
+    return result
 
 # Keyboard scancodes for events/states.
 TK_A                = 0x04
