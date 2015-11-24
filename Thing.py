@@ -6,6 +6,7 @@ class Thing:
         self.y = y
         self.z = z
         self.raw_char = char
+        self.raw_color = color
         self.color = "[color={}]".format(color)
         self.apparel = set()
         self.physical = physical
@@ -32,5 +33,3 @@ class Actor(Thing):
 class Tile(Thing):
     def __init__(self, x, y, z, char, color, physical, invisible=False):
         super().__init__(x, y, z, char, color, physical, invisible)
-        if not invisible:
-            invisible = physical
