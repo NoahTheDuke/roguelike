@@ -1,0 +1,14 @@
+player:
+    name: "Butts"
+    type: "Player"
+    x: 6
+    y: 6
+    z: 1
+    char: '@'
+    color: 'white'
+    physical: true
+    invisible: false
+    health: 0
+    mana: 0
+    attack: 0
+    defense: 0
