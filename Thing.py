@@ -1,8 +1,29 @@
 from uuid import uuid4
 from collections.abc import Sequence
+from enum import Enum
+
+class AutoEnum(Enum):
+    def __new__(cls):
+        value = len(cls.__members__) + 1
+        obj = object.__new__(cls)
+        obj._value_ = value
+        return obj
+
+
+class Game_States(AutoEnum):
+    MAIN_MENU = ()
+    NEW_GAME = ()
+    IN_GAME = ()
+    OPTIONS = ()
+    HISTORY = ()
+
 
 class Actor:
-    def __init__(self, name, world, x, y, char, color, physical):
+    def __init__(self, world, name, x, y, char, color, physical,
+                 visible=True, max_health=None, cur_health=None,
+                 max_mana=None, cur_mana=None, attack=None, defense=None,
+                 apparel=None):
+        # Engine Stats
         self.name = name
         self.x = x
         self.y = y
@@ -10,14 +31,26 @@ class Actor:
         self.raw_color = color
         self.color = "[color={}]".format(color)
         self.physical = physical
-        self.invisible = False
-        self.health = 0
-        self.mana = 0
-        self.attack = 0
+        self.visible = visible
+        self.inventory = []
         self.uuid = uuid4()
+        # Generic Stats
+        self.max_health = max_health
+        self.cur_health = cur_health or max_health
+        self.max_mana = max_mana
+        self.cur_mana = cur_mana or max_mana
+        self.attack = attack
+        self.defense = defense
         self.apparel = set()
+        # Finalization Methods
         self.update_char()
         world.register(self)
+
+    def __eq__(self, other):
+        return ((self.raw_char, self.raw_color,
+                 self.physical, self.visible) ==
+                (other.raw_char, other.raw_color,
+                 other.physical, other.visible))
 
     def update_char(self):
         elements = [self.color + self.raw_char] + [x for x in self.apparel]
@@ -40,6 +73,10 @@ class Item:
         self.physical = physical
         self.uuid = uuid4()
 
+    def __eq__(self, other):
+        return ((self.raw_char, self.raw_color, self.physical) ==
+                (other.raw_char, other.raw_color, other.physical))
+
 
 class Prop:
     def __init__(self, name, x, y, char, color, physical):
@@ -50,6 +87,10 @@ class Prop:
         self.color = "[color={}]".format(color)
         self.physical = physical
         self.uuid = uuid4()
+
+    def __eq__(self, other):
+        return ((self.raw_char, self.raw_color, self.physical) ==
+                (other.raw_char, other.raw_color, other.physical))
 
 
 class Tile:

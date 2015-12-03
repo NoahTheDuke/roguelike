@@ -1,0 +1,9 @@
+human:
+    name: 'Butts'
+    char: '@'
+    color: 'white'
+    physical: True
+    max_health: 20
+    max_mana: 10
+    attack: 5
+    defense: 5

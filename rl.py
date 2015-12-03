@@ -1,17 +1,17 @@
-import PyBearLibTerminal as blt
-from Thing import Actor, Map
 import yaml
+import PyBearLibTerminal as blt
+from Thing import Actor, Map, Game_States
 
+# Rendering constants
 WINDOW_WIDTH = 80
 WINDOW_HEIGHT = 45
 SCREEN_WIDTH = 58
 SCREEN_HEIGHT = 36
 UPDATE_INTERVAL_MS = 14
+CELLSIZE = "12x12"
 
-cellsize = "12x12"
-
-def make_map():
-    return Map(SCREEN_WIDTH, SCREEN_HEIGHT, 2)
+# Game state constants
+game_states = Game_States
 
 def render_all(character, world, offset):
     render_viewport(world, offset)
@@ -50,17 +50,12 @@ def render_sidebar(character, world):
     spacing = 4
     loc = SCREEN_WIDTH + 1
     blt.print_(loc, 2 + spacing, "Name:   {}{}".format(character.color, character.name))
-    blt.print_(loc, 3 + spacing, "Health: [color=red]{}".format(character.health))
-    blt.print_(loc, 4 + spacing, "Mana:   [color=lighter blue]{}".format(character.mana))
+    blt.print_(loc, 3 + spacing, "Health: [color=red]{}".format(character.cur_health))
+    blt.print_(loc, 4 + spacing, "Mana:   [color=lighter blue]{}".format(character.cur_mana))
 
 def render_message_bar():
     global SCREEN_WIDTH, SCREEN_HEIGHT
-    mx, my = 0, 0
-    if blt.state(blt.TK_MOUSE_X) < SCREEN_WIDTH and \
-            blt.state(blt.TK_MOUSE_Y) < SCREEN_HEIGHT:
-        mx, my = blt.state(blt.TK_MOUSE_X), blt.state(blt.TK_MOUSE_Y)
-    blt.print_(2, SCREEN_HEIGHT + 1, "X: {}".format(mx))
-    blt.print_(2, SCREEN_HEIGHT + 2, "Y: {}".format(my))
+    blt.print_(2, SCREEN_HEIGHT, "Messages: ")
 
 def move_actor(world, actor, direction):
     global WINDOW_WIDTH, WINDOW_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT
@@ -72,28 +67,41 @@ def move_actor(world, actor, direction):
             if not world[dx][dy].occupied:
                 actor.move(world, x, y)
 
-def generate_player(world):
-    with open("player.yaml", 'r') as player_yaml:
+def generate_world(level):
+    w = []
+    with open("data/world.yaml", 'r') as world_yaml:
+        world = yaml.load_all(world_yaml)
+        for x in world:
+            w.append(x)
+        w = w[0]
+    return Map(SCREEN_WIDTH, SCREEN_HEIGHT, num_exits=2)
+
+def generate_player(world, race):
+    with open("data/player.yaml", 'r') as player_yaml:
         pc = yaml.load(player_yaml)
-    return Actor(pc['name'], world, pc['x'], pc['y'],
-                 pc['char'], pc['color'], pc['physical'])
+    x, y = 6, 6
+    pc = pc[race]
+    return Actor(world, pc['name'], x, y, pc['char'], pc['color'], pc['physical'],
+                 pc['max_health'], pc['max_mana'], pc['attack'], pc['defense'])
 
 def generate_monsters(world):
     return True
 
 def main():
     global WINDOW_WIDTH, WINDOW_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT
-    global cellsize
+    global CELLSIZE
     blt.open_()
     blt.set_("window: size={}x{}, cellsize={}, title='Roguelike';"
-             "font: default".format(str(WINDOW_WIDTH), str(WINDOW_HEIGHT), cellsize))
+             "font: default".format(str(WINDOW_WIDTH), str(WINDOW_HEIGHT), CELLSIZE))
     blt.clear()
     blt.refresh()
     blt.color("white")
     offset = (0, 0)
 
-    world = make_map()
-    pc = generate_player(world)
+    level = "town"
+    world = generate_world(level)
+    race = "human"
+    pc = generate_player(world, race)
 
     proceed = True
     while proceed:

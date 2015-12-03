@@ -1,0 +1,14 @@
+town:
+    name: 'town'
+    width: 200
+    height: 200
+    max_rooms: 10
+    min_rooms: 2
+    num_exits: 2
+dungeon_1:
+    name: 'dungeon: 1'
+    width: 200
+    height: 200
+    max_rooms: 10
+    min_rooms: 2
+    num_exits: 2
