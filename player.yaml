@@ -1,0 +1,1 @@
+{name: "Butts", x: 6, y: 6, char: '@', color: 'white', physical: True, health: 0, mana: 0, attack: 0, defense: 0}

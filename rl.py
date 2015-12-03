@@ -1,5 +1,6 @@
 import PyBearLibTerminal as blt
 from Thing import Actor, Map
+import yaml
 
 WINDOW_WIDTH = 80
 WINDOW_HEIGHT = 45
@@ -12,44 +13,54 @@ cellsize = "12x12"
 def make_map():
     return Map(SCREEN_WIDTH, SCREEN_HEIGHT, 2)
 
-def render_all(character, world, world_objs, offset):
-    render_viewport(world, world_objs, offset)
-    render_sidebar(world_objs, character)
+def render_all(character, world, offset):
+    render_viewport(world, offset)
+    render_sidebar(character, world)
     render_message_bar()
 
-def render_viewport(world, world_objs, offset):
+def render_viewport(world, offset):
     global SCREEN_WIDTH, SCREEN_HEIGHT
-    off_x, off_y = offset
-    size_w, size_h = SCREEN_WIDTH, SCREEN_HEIGHT
-    for col, column in enumerate(world.layout):
-        if off_x <= col <= off_x + size_w:
+    offset_x, offset_y = offset
+    screen_w, screen_h = SCREEN_WIDTH, SCREEN_HEIGHT
+    print_ = blt.print_
+    for col, column in enumerate(world):
+        if offset_x <= col <= offset_x + screen_w:
             for row, tile in enumerate(column):
-                if off_y <= row <= off_y + size_h:
+                if offset_y <= row <= offset_y + screen_h:
                     tile.update_char()
-                    blt.print_(tile.x + off_x, tile.y + off_y, tile.char)
-    for key, obj in world_objs.items():
-        if obj.invisible is not True:
-            blt.print_(obj.x, obj.y, obj.char)
-    cur_layer = blt.state(blt.TK_LAYER)
-    blt.layer(255)
-    blt.layer(cur_layer)
+                    if tile.occupied:
+                        print_(tile.x + offset_x,
+                               tile.y + offset_y,
+                               tile.occupied.char)
+                    elif tile.prop:
+                        print_(tile.x + offset_x,
+                               tile.y + offset_y,
+                               tile.prop.char)
+                    elif tile.item:
+                        print_(tile.x + offset_x,
+                               tile.y + offset_y,
+                               tile.item.char)
+                    else:
+                        print_(tile.x + offset_x,
+                               tile.y + offset_y,
+                               tile.char)
 
-def render_sidebar(world_objs, pc_uuid):
+def render_sidebar(character, world):
     global SCREEN_WIDTH, SCREEN_HEIGHT
     spacing = 4
     loc = SCREEN_WIDTH + 1
-    character = world_objs[pc_uuid]
     blt.print_(loc, 2 + spacing, "Name:   {}{}".format(character.color, character.name))
     blt.print_(loc, 3 + spacing, "Health: [color=red]{}".format(character.health))
     blt.print_(loc, 4 + spacing, "Mana:   [color=lighter blue]{}".format(character.mana))
 
 def render_message_bar():
     global SCREEN_WIDTH, SCREEN_HEIGHT
-    loc = SCREEN_HEIGHT
-    if blt.state(blt.TK_MOUSE_X) <= SCREEN_WIDTH and \
-            blt.state(blt.TK_MOUSE_Y) <= SCREEN_HEIGHT:
-        blt.print_(2, loc + 1, "X: {}".format(blt.TK_MOUSE_X))
-        blt.print_(2, loc + 2, "Y: {}".format(blt.TK_MOUSE_Y))
+    mx, my = 0, 0
+    if blt.state(blt.TK_MOUSE_X) < SCREEN_WIDTH and \
+            blt.state(blt.TK_MOUSE_Y) < SCREEN_HEIGHT:
+        mx, my = blt.state(blt.TK_MOUSE_X), blt.state(blt.TK_MOUSE_Y)
+    blt.print_(2, SCREEN_HEIGHT + 1, "X: {}".format(mx))
+    blt.print_(2, SCREEN_HEIGHT + 2, "Y: {}".format(my))
 
 def move_actor(world, actor, direction):
     global WINDOW_WIDTH, WINDOW_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT
@@ -57,33 +68,32 @@ def move_actor(world, actor, direction):
     fx, fy = actor.x, actor.y
     dx, dy = fx + x, fy + y
     if SCREEN_WIDTH > dx >= 0 and SCREEN_HEIGHT > dy >= 0:
-        if not world.layout[dx][dy].physical:
-            if not world.layout[dx][dy].occupied:
+        if not world[dx][dy].physical:
+            if not world[dx][dy].occupied:
                 actor.move(world, x, y)
 
 def generate_player(world):
-    pc = Actor("Butts", 6, 6, 1, "@", "white", physical=True)
-    world.register(pc)
-    world_objs = {}
-    world_objs[pc.uuid] = pc
-    return world_objs, pc
+    with open("player.yaml", 'r') as player_yaml:
+        pc = yaml.load(player_yaml)
+    return Actor(pc['name'], world, pc['x'], pc['y'],
+                 pc['char'], pc['color'], pc['physical'])
+
+def generate_monsters(world):
+    return True
 
 def main():
     global WINDOW_WIDTH, WINDOW_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT
-    global cellsize, world_objs, world_obj_locs
+    global cellsize
     blt.open_()
     blt.set_("window: size={}x{}, cellsize={}, title='Roguelike';"
              "font: default".format(str(WINDOW_WIDTH), str(WINDOW_HEIGHT), cellsize))
     blt.clear()
     blt.refresh()
     blt.color("white")
-
     offset = (0, 0)
 
-    full_map = make_map()
-    world = full_map
-    world_objs, pc = generate_player(world)
-    pc_uuid = pc.uuid
+    world = make_map()
+    pc = generate_player(world)
 
     proceed = True
     while proceed:
@@ -113,12 +123,7 @@ def main():
                 blt.print_(blt.TK_MOUSE_X, blt.TK_MOUSE_Y, "[color=yellow]X")
             elif key == (blt.TK_MOUSE_RIGHT | blt.TK_KEY_RELEASED):
                 move_actor(world, pc, (1, 1))
-            # elif key == blt.TK_MOUSE_MOVE:
-                    # if blt.check(blt.TK_MOUSE_RIGHT):
-                        # selection_bounds = build_selection(selection_origin)
-                    # if blt.check(blt.TK_MOUSE_RIGHT|blt.TK_KEY_RELEASED):
-                        # selection = build_selection(selection_bounds)
-        render_all(pc_uuid, world, world_objs, offset)
+        render_all(pc, world, offset)
         blt.refresh()
     blt.close()
 
