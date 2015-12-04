@@ -65,108 +65,108 @@ _library.terminal_bkcolor.argtypes = [ctypes.c_uint32]
 _library.color_from_name8.restype = ctypes.c_uint32
 _color_from_wname.restype = ctypes.c_uint32
 
-def color_from_name(s):
+def terminal_color_from_name(s):
     if _version3 or isinstance(s, unicode):
         return _color_from_wname(s)
     else:
         return _library.color_from_name8(s)
 
-def open_():
+def terminal_open():
     if _library.terminal_open() == 0:
         return False
     _library.terminal_set8('terminal: encoding=ascii, encoding-affects-put=false')
     return True
 
-close = _library.terminal_close
+terminal_close = _library.terminal_close
 
-def set_(s):
+def terminal_set(s):
     if _version3 or isinstance(s, unicode):
         _wset(s)
     else:
         _library.terminal_set8(s)
 
-def setf(s, *args):
+def terminal_setf(s, *args):
     return set(s.format(*args))
 
-refresh = _library.terminal_refresh
+terminal_refresh = _library.terminal_refresh
 
-clear = _library.terminal_clear
+terminal_clear = _library.terminal_clear
 
-clear_area = _library.terminal_clear_area
+terminal_clear_area = _library.terminal_clear_area
 
-crop = _library.terminal_crop
+terminal_crop = _library.terminal_crop
 
-layer = _library.terminal_layer
+terminal_layer = _library.terminal_layer
 
-def color(v):
+def terminal_color(v):
     if isinstance(v, numbers.Number):
         _library.terminal_color(v)
     else:
-        _library.terminal_color(color_from_name(v))
+        _library.terminal_color(terminal_color_from_name(v))
 
-def bkcolor(v):
+def terminal_bkcolor(v):
     if isinstance(v, numbers.Number):
         _library.terminal_bkcolor(v)
     else:
-        _library.terminal_bkcolor(color_from_name(v))
+        _library.terminal_bkcolor(terminal_color_from_name(v))
 
 composition = _library.terminal_composition
 
-def put(x, y, c):
+def terminal_put(x, y, c):
     if not isinstance(c, numbers.Number):
         c = ord(c)
     _library.terminal_put(x, y, c)
 
-def put_ext(x, y, dx, dy, c, corners=None):
+def terminal_put_ext(x, y, dx, dy, c, corners=None):
     if not isinstance(c, numbers.Number):
         c = ord(c)
     if corners is None:
         _library.terminal_put_ext(x, y, dx, dy, c, None)
     else:
         for i in range(0, 4):
-            put_ext.corners[i] = corners[i]
-        _library.terminal_put_ext(x, y, dx, dy, c, ctypes.cast(put_ext.corners, ctypes.POINTER(ctypes.c_uint)))
-put_ext.corners = (ctypes.c_uint32 * 4)()
+            terminal_put_ext.corners[i] = corners[i]
+        _library.terminal_put_ext(x, y, dx, dy, c, ctypes.cast(terminal_put_ext.corners, ctypes.POINTER(ctypes.c_uint)))
+terminal_put_ext.corners = (ctypes.c_uint32 * 4)()
 
-def pick(x, y, z = 0):
+def terminal_pick(x, y, z = 0):
     return _library.terminal_pick(x, y, z);
 
-def pick_color(x, y, z = 0):
+def terminal_pick_color(x, y, z = 0):
     return _library.terminal_pick_color(x, y, z);
 
-pick_bkcolor = _library.terminal_pick_bkcolor
+terminal_pick_bkcolor = _library.terminal_pick_bkcolor
 
-def print_(x, y, s):
+def terminal_print(x, y, s):
     if _version3 or isinstance(s, unicode):
         return _wprint(x, y, s)
     else:
         return _library.terminal_print8(x, y, s)
 
-def printf(x, y, s, *args):
-    return print_(x, y, s.format(*args))
+def terminal_printf(x, y, s, *args):
+    return terminal_print(x, y, s.format(*args))
 
-def measure(s):
+def terminal_measure(s):
     if _version3 or isinstance(s, unicode):
         return _wmeasure(s)
     else:
         return _library.terminal_measure8(s)
 
-def measuref(s, *args):
-    return measure(s.format(*args))
+def terminal_measuref(s, *args):
+    return terminal_measure(s.format(*args))
 
-def has_input():
+def terminal_has_input():
     return _library.terminal_has_input() == 1
 
-state = _library.terminal_state
+terminal_state = _library.terminal_state
 
-def check(state):
+def terminal_check(state):
     return _library.terminal_state(state) == 1
 
-read = _library.terminal_read
+terminal_read = _library.terminal_read
 
-peek = _library.terminal_peek
+terminal_peek = _library.terminal_peek
 
-def read_str(x, y, s, max):
+def terminal_read_str(x, y, s, max):
     if _version3 or isinstance(s, unicode):
         p = ctypes.create_unicode_buffer(s, max+1)
         rc = _read_wstr(x, y, p, max)
@@ -176,18 +176,18 @@ def read_str(x, y, s, max):
         rc = _library.terminal_read_str8(x, y, p, max)
         return rc, p.value
 
-delay = _library.terminal_delay
+terminal_delay = _library.terminal_delay
 
 _library.terminal_get8.restype = ctypes.c_char_p
 _wget.restype = ctypes.c_wchar_p
 
-def get(s, default_value=None):
+def terminal_get(s, default_value=None):
     if _version3 or isinstance(s, unicode):
         return unicode(_wget(s, default_value));
     else:
         return str(_library.terminal_get8(s, default_value))
 
-def color_from_argb(a, r, g, b):
+def terminal_color_from_argb(a, r, g, b):
     result = a
     result = result * 256 + r
     result = result * 256 + g

@@ -1,14 +1,18 @@
 town:
     name: 'town'
-    width: 200
-    height: 200
+    level: None
+    region: start
+    width: 58
+    height: 36
+    min_rooms: 5
     max_rooms: 10
-    min_rooms: 2
     num_exits: 2
 dungeon_1:
     name: 'dungeon: 1'
+    level: 1
+    region: dungeon
     width: 200
     height: 200
-    max_rooms: 10
     min_rooms: 2
+    max_rooms: 10
     num_exits: 2
