@@ -18,7 +18,7 @@ class Game_States(AutoEnum):
     HISTORY = ()
 
 class Actor:
-    def __init__(self, world, name, x, y, char, color, physical,
+    def __init__(self, world, name, x, y, glyph, color, physical,
                  visible=True, max_health=None, cur_health=None,
                  max_mana=None, cur_mana=None, attack=None, defense=None,
                  apparel=None):
@@ -26,9 +26,8 @@ class Actor:
         self.name = name
         self.x = x
         self.y = y
-        self.raw_char = char
-        self.raw_color = color
-        self.color = "[color={}]".format(color)
+        self.glyph = glyph
+        self.color = color
         self.physical = physical
         self.visible = visible
         self.inventory = []
@@ -42,18 +41,18 @@ class Actor:
         self.defense = defense
         self.apparel = set()
         # Finalization Methods
-        self.update_char()
+        self.build_char()
         world.register(self)
 
     def __eq__(self, other):
-        return ((self.raw_char, self.raw_color,
+        return ((self.glyph, self.color,
                  self.physical, self.visible) ==
-                (other.raw_char, other.raw_color,
+                (other.glyph, other.color,
                  other.physical, other.visible))
 
-    def update_char(self):
-        self.color = "[color={}]".format(self.raw_color)
-        elements = [self.color + self.raw_char] + [x for x in self.apparel]
+    def build_char(self):
+        apparel = "[+]" + [x for x in self.apparel] if self.apparel else ""
+        elements = "[color={}]".format(self.color) + self.glyph + apparel
         self.char = "".join(e for e in elements)
 
     def move(self, world, dx, dy):
@@ -63,40 +62,46 @@ class Actor:
         return self.x, self.y
 
 class Item:
-    def __init__(self, name, x, y, char, color, physical):
+    def __init__(self, name, x, y, glyph, color, physical):
         self.x = x
         self.y = y
-        self.raw_char = char
-        self.raw_color = color
-        self.color = "[color={}]".format(color)
+        self.glyph = glyph
+        self.color = color
         self.physical = physical
         self.uuid = uuid4()
 
     def __eq__(self, other):
-        return ((self.raw_char, self.raw_color, self.physical) ==
-                (other.raw_char, other.raw_color, other.physical))
+        return ((self.glyph, self.color, self.physical) ==
+                (other.glyph, other.color, other.physical))
+
+    def build_char(self):
+        elements = ["[color={}]".format(self.color) + self.glyph]
+        self.char = "".join(e for e in elements)
 
 class Prop:
-    def __init__(self, name, x, y, char, color, physical):
+    def __init__(self, name, x, y, glyph, color, physical):
         self.x = x
         self.y = y
-        self.raw_char = char
-        self.raw_color = color
-        self.color = "[color={}]".format(color)
+        self.glyph = glyph
+        self.color = color
         self.physical = physical
         self.uuid = uuid4()
 
     def __eq__(self, other):
-        return ((self.raw_char, self.raw_color, self.physical) ==
-                (other.raw_char, other.raw_color, other.physical))
+        return ((self.glyph, self.color, self.physical) ==
+                (other.glyph, other.color, other.physical))
+
+    def build_char(self):
+        elements = ["[color={}]".format(self.color) + self.glyph]
+        self.char = "".join(e for e in elements)
 
 class Tile:
-    def __init__(self, x, y, char, color, physical):
+    def __init__(self, x, y, glyph, color, bgcolor, physical):
         self.x = x
         self.y = y
-        self.raw_char = char
-        self.raw_color = color
-        self.color = "[color={}]".format(color)
+        self.glyph = glyph
+        self.color = color
+        self.bgcolor = bgcolor
         self.physical = physical
         self.occupied = None
         self.prop = None
@@ -104,15 +109,18 @@ class Tile:
         self.uuid = uuid4()
 
     def __eq__(self, other):
-        return ((self.raw_char, self.raw_color, self.physical) ==
-                (other.raw_char, other.raw_color, other.physical))
+        return ((self.glyph, self.color, self.physical) ==
+                (other.glyph, other.color, other.physical))
 
     def __str__(self):
-        return "x: {}, y: {}, raw_char: {}, char: {}, raw_color: {}, color: {}, physical: {}, occupied: {}, prop: {}, item: {}, uuid: {}".format(self.x, self.y, self.raw_char, self.char, self.raw_color, self.color, self.physical, self.occupied, self.prop, self.item, self.uuid)
+        return "x: {}, y: {}, glyph: {}, char: {}, color: {}, physical: {}, occupied: {}, prop: {}, item: {}, uuid: {}".format(self.x, self.y, self.glyph, self.char, self.color, self.physical, self.occupied, self.prop, self.item, self.uuid)
 
-    def update_char(self):
-        self.color = "[color={}]".format(self.raw_color)
-        elements = [self.color + self.raw_char]
+    def update(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    def build_char(self):
+        elements = ["[color={}]".format(self.color) + self.glyph]
         self.char = "".join(e for e in elements)
 
 class Map(Sequence):
@@ -129,6 +137,7 @@ class Map(Sequence):
         self.rooms = []
         self.passages = []
         self.region = region
+        self.start_loc = None
         self.generate_map(width, height, num_exits)
 
     def __getitem__(self, key):
@@ -161,15 +170,16 @@ class Map(Sequence):
         self.build_features()
 
     def generate_ground(self, width, height):
-        self.layout = [[Tile(x, y, '#', 'black', True)
+        self.layout = [[Tile(x=x, y=y, glyph='.', color='lightest grey',
+                        bgcolor='black', physical=True)
                             for y in range(height)]
                                 for x in range(width)]
 
     def carve_rooms(self):
-        cur_max = randint(self.min_rooms, self.max_rooms)
+        # cur_max = randint(self.min_rooms, self.max_rooms)
+        cur_max = self.max_rooms
         while len(self.rooms) <= cur_max:
-            w, h = randint(3, 10), randint(3, 10)
-            print("w, h", w, h)
+            w, h = randint(4, 10), randint(4, 10)
             x, y = randint(0, self.width - w), randint(0, self.height - h)
             new_room = RectRoom(x, y, w, h)
             failed = False
@@ -179,27 +189,19 @@ class Map(Sequence):
                     break
             if not failed:
                 self.rooms.append(new_room)
-                if len(self.rooms) is 1:
+                if not self.start_loc:
                     self.start_loc = new_room.center()
-                print(str(len(self.rooms)), new_room.x1, new_room.y1, new_room.x2, new_room.y2)
                 for x in range(new_room.x1, new_room.x2):
                     for y in range(new_room.y1, new_room.y2):
                         if ((x == new_room.x1) or
                            (x == new_room.x2 - 1) or
                            (y == new_room.y1) or
                            (y == new_room.y2 - 1)):
-                            self.layout[x][y].raw_char = '#'
-                            self.layout[x][y].raw_color = 'amber'
-                            self.layout[x][y].update_char()
-                            # print(self.layout[x][y])
+                            self.layout[x][y].update(glyph='#', color='grey')
                         else:
-                            self.layout[x][y].raw_char = '.'
-                            self.layout[x][y].raw_color = 'amber'
-                            self.layout[x][y].physical = False
-                            self.layout[x][y].update_char()
-                            # print(self.layout[x][y])
+                            self.layout[x][y].update(glyph='.', color='amber', physical=False)
                 x, y = new_room.center()
-                self.layout[x][y].raw_char = str(len(self.rooms))
+                self.layout[x][y].glyph = str(chr(64 + len(self.rooms)))
 
     def carve_passages(self):
         pass
@@ -209,7 +211,6 @@ class Map(Sequence):
 
     def register(self, actor):
         self.layout[actor.x][actor.y].occupied = actor
-        return
 
     def move_actor(self, actor, dx, dy):
         self.layout[actor.x][actor.y].occupied = None

@@ -35,7 +35,7 @@ def render_viewport(world, offset):
         if offset_x <= col <= offset_x + screen_w:
             for row, tile in enumerate(column):
                 if offset_y <= row <= offset_y + screen_h:
-                    tile.update_char()
+                    tile.build_char()
                     if tile.occupied:
                         terminal_print(tile.x + offset_x,
                                        tile.y + offset_y,
@@ -59,7 +59,7 @@ def render_UI(character, world):
     spacing = 4
     loc = SCREEN_WIDTH + 1
     terminal_layer(10)
-    terminal_print(loc, 2 + spacing, "Name:   {}{}".format(character.color, character.name))
+    terminal_print(loc, 2 + spacing, "Name:   [color={}]{}".format(character.color, character.name))
     terminal_print(loc, 3 + spacing, "Health: [color=red]{}".format(character.cur_health))
     terminal_print(loc, 4 + spacing, "Mana:   [color=lighter blue]{}".format(character.cur_mana))
 
@@ -69,15 +69,15 @@ def render_message_bar():
     terminal_layer(15)
     terminal_print(2, SCREEN_HEIGHT, "Messages: ")
 
-def move_actor(world, actor, direction):
+def move_actor(world, actor, to):
     global WINDOW_WIDTH, WINDOW_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT
     fx, fy = actor.x, actor.y
-    dx, dy = direction
-    x, y = fx + dx, fy + dy
-    if SCREEN_WIDTH > x >= 0 and SCREEN_HEIGHT > y >= 0:
-        if not world[x][y].physical:
-            if not world[x][y].occupied:
-                actor.move(world, dx, dy)
+    tx, ty = to
+    dx, dy = fx + tx, fy + ty
+    if SCREEN_WIDTH > dx >= 0 and SCREEN_HEIGHT > dy >= 0:
+        if not world[dx][dy].physical:
+            if not world[dx][dy].occupied:
+                actor.move(world, tx, ty)
 
 def generate_world(name):
     w = []
