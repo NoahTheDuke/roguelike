@@ -1,12 +1,11 @@
 import PyBearLibTerminal as terminal
-import itertools as it
 
 terminal.open_()
 # size = "auto"
 size = "12x12"
 terminal.set_("window: size=64x36, cellsize={}, title='Omni: menu',"
               "resizeable=true;"
-             "font: default".format(size))
+              "font: default".format(size))
 terminal.clear()
 terminal.refresh()
 terminal.color("white")
@@ -18,11 +17,11 @@ while proceed:
     long_word = "antidisestablishmentarianism."
     long_word_len = len(long_word) - 1
     for i in range(long_word_len):
-        factor = i/long_word_len
+        factor = i / long_word_len
         red = (1 - factor) * 255
         green = factor * 255
         terminal.color(terminal.color_from_argb(255, int(red), int(green), 0))
-        terminal.put(1+n+i, 1, long_word[i])
+        terminal.put(1 + n + i, 1, long_word[i])
 
     terminal.color("white")
     terminal.print_(1, 3,
