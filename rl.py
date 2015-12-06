@@ -56,12 +56,12 @@ def render_viewport(world, offset):
 @layer_wrap
 def render_UI(character, world):
     global SCREEN_WIDTH, SCREEN_HEIGHT
-    spacing = 4
+    spacing = 0
     loc = SCREEN_WIDTH + 1
     terminal_layer(10)
-    terminal_print(loc, 2 + spacing, "Name:   [color={}]{}".format(character.color, character.name))
-    terminal_print(loc, 3 + spacing, "Health: [color=red]{}".format(character.cur_health))
-    terminal_print(loc, 4 + spacing, "Mana:   [color=lighter blue]{}".format(character.cur_mana))
+    terminal_print(loc, 1 + spacing, "Name:   [color={}]{}".format(character.color, character.name))
+    terminal_print(loc, 2 + spacing, "Health: [color=red]{}".format(character.cur_health))
+    terminal_print(loc, 3 + spacing, "Mana:   [color=lighter blue]{}".format(character.cur_mana))
 
 @layer_wrap
 def render_message_bar():
@@ -75,9 +75,10 @@ def move_actor(world, actor, to):
     tx, ty = to
     dx, dy = fx + tx, fy + ty
     if SCREEN_WIDTH > dx >= 0 and SCREEN_HEIGHT > dy >= 0:
-        if not world[dx][dy].physical:
-            if not world[dx][dy].occupied:
-                actor.move(world, tx, ty)
+        if actor.move(world, tx, ty):
+            print("Good job, ya moved.")
+        else:
+            print("Can't move there, homie.")
 
 def generate_world(name):
     w = []
@@ -141,6 +142,8 @@ def main():
                 move_actor(world, pc, (-1, 1))
             elif key == TK_N:
                 move_actor(world, pc, (1, 1))
+            elif key == TK_C:
+                try_door(world, pc)
             elif key == (TK_MOUSE_RIGHT):
                 terminal_print(TK_MOUSE_X, TK_MOUSE_Y, "[color=yellow]X")
             elif key == (TK_MOUSE_RIGHT | TK_KEY_RELEASED):

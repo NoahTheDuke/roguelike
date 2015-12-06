@@ -1,7 +1,7 @@
 from uuid import uuid4
 from collections.abc import Sequence
 from enum import Enum
-from random import randint
+from random import randint, randrange
 
 class AutoEnum(Enum):
     def __new__(cls):
@@ -55,11 +55,19 @@ class Actor:
         elements = "[color={}]".format(self.color) + self.glyph + apparel
         self.char = "".join(e for e in elements)
 
-    def move(self, world, dx, dy):
-        world.move_actor(self, dx, dy)
-        self.x += dx
-        self.y += dy
-        return self.x, self.y
+    def move(self, world, tx, ty):
+        tick, moved = world.move_actor(self, tx, ty)
+        if moved:
+            self.x += tx
+            self.y += ty
+        return tick
+
+    def adjacent(self, world):
+        adjacent = []
+        for x in range(self.x - 1, self.x + 2):
+            for y in range(self.y - 1, self.y + 2):
+                adjacent.append((x, y))
+        return adjacent
 
 class Item:
     def __init__(self, name, x, y, glyph, color, physical):
@@ -106,11 +114,13 @@ class Tile:
         self.occupied = None
         self.prop = None
         self.item = None
+        self.is_door = False
+        self.door_status = False
         self.uuid = uuid4()
 
     def __eq__(self, other):
-        return ((self.glyph, self.color, self.physical) ==
-                (other.glyph, other.color, other.physical))
+        return ((self.glyph, self.color, self.physical, self.door[0]) ==
+                (other.glyph, other.color, other.physical, other.door[0]))
 
     def __str__(self):
         return "x: {}, y: {}, glyph: {}, char: {}, color: {}, physical: {}, occupied: {}, prop: {}, item: {}, uuid: {}".format(self.x, self.y, self.glyph, self.char, self.color, self.physical, self.occupied, self.prop, self.item, self.uuid)
@@ -118,6 +128,13 @@ class Tile:
     def update(self, **kwargs):
         for key, value in kwargs.items():
             setattr(self, key, value)
+
+    # def build_door(self):
+
+    def toggle_door(self):
+        if self.is_door:
+            self.door_status = not self.door_status
+            self.glyph = ["+", "-"][self.door_status]
 
     def build_char(self):
         elements = ["[color={}]".format(self.color) + self.glyph]
@@ -163,6 +180,23 @@ class Map(Sequence):
                         return True
         return False
 
+    def register(self, actor):
+        self.layout[actor.x][actor.y].occupied = actor
+
+    def move_actor(self, actor, tx, ty):
+        dx, dy = actor.x + tx, actor.y + ty
+        if not self[dx][dy].physical:
+            if not self[dx][dy].occupied:
+                self[actor.x][actor.y].occupied = None
+                self[dx][dy].occupied = actor
+                return (True, True)
+        else:
+            if self[dx][dy].door == (True, True):
+                print('door')
+                self[dx][dy].update(glyph='-', door=(True, False))
+                return (True, False)
+        return (False, False)
+
     def generate_map(self, width, height, num_exits):
         self.generate_ground(width, height)
         self.carve_rooms()
@@ -170,14 +204,14 @@ class Map(Sequence):
         self.build_features()
 
     def generate_ground(self, width, height):
-        self.layout = [[Tile(x=x, y=y, glyph='.', color='lightest grey',
-                        bgcolor='black', physical=True)
+        self.layout = [[Tile(x=x, y=y, glyph='.', color='lightest orange',
+                        bgcolor='black', physical=False)
                             for y in range(height)]
                                 for x in range(width)]
 
     def carve_rooms(self):
-        # cur_max = randint(self.min_rooms, self.max_rooms)
-        cur_max = self.max_rooms
+        cur_max = randint(self.min_rooms, self.max_rooms)
+        # cur_max = self.max_rooms
         while len(self.rooms) <= cur_max:
             w, h = randint(4, 10), randint(4, 10)
             x, y = randint(0, self.width - w), randint(0, self.height - h)
@@ -187,47 +221,54 @@ class Map(Sequence):
                 if new_room.intersect(other_room):
                     failed = True
                     break
+                if (new_room.x_r >= self.width) or (new_room.y_b >= self.height):
+                    failed = True
+                    break
             if not failed:
                 self.rooms.append(new_room)
                 if not self.start_loc:
                     self.start_loc = new_room.center()
-                for x in range(new_room.x1, new_room.x2):
-                    for y in range(new_room.y1, new_room.y2):
-                        if ((x == new_room.x1) or
-                           (x == new_room.x2 - 1) or
-                           (y == new_room.y1) or
-                           (y == new_room.y2 - 1)):
-                            self.layout[x][y].update(glyph='#', color='grey')
+                for x in range(new_room.x_l, new_room.x_r + 1):
+                    for y in range(new_room.y_t, new_room.y_b + 1):
+                        if ((x == new_room.x_l) or
+                           (x == new_room.x_r) or
+                           (y == new_room.y_t) or
+                           (y == new_room.y_b)):
+                            self.layout[x][y].update(glyph='#', color='grey', physical=True)
                         else:
-                            self.layout[x][y].update(glyph='.', color='amber', physical=False)
-                x, y = new_room.center()
+                            self.layout[x][y].update(glyph='.', color='amber')
+                x, y = new_room.x_r, new_room.y_b
                 self.layout[x][y].glyph = str(chr(64 + len(self.rooms)))
 
     def carve_passages(self):
         pass
 
     def build_features(self):
-        pass
-
-    def register(self, actor):
-        self.layout[actor.x][actor.y].occupied = actor
-
-    def move_actor(self, actor, dx, dy):
-        self.layout[actor.x][actor.y].occupied = None
-        self.layout[actor.x + dx][actor.y + dy].occupied = actor
+        for room in self.rooms:
+            side = randint(0, 3)
+            if side is 0:
+                x, y = (randrange(room.x_l + 1, room.x_r), room.y_t)
+            elif side is 1:
+                x, y = (room.x_l, randrange(room.y_t + 1, room.y_b))
+            elif side is 2:
+                x, y = (randrange(room.x_l + 1, room.x_r), room.y_b)
+            elif side is 3:
+                x, y = (room.x_r, randrange(room.y_t + 1, room.y_b))
+            self.[x][y].update(glyph='+', color='white',
+                                     physical=True, door=(True, True))
 
 class RectRoom:
     def __init__(self, x, y, w, h):
-        self.x1 = x
-        self.y1 = y
-        self.x2 = x + w
-        self.y2 = y + h
+        self.x_l = x
+        self.y_t = y
+        self.x_r = x + w
+        self.y_b = y + h
 
     def center(self):
-        x = (self.x1 + self.x2) // 2
-        y = (self.y1 + self.y2) // 2
+        x = (self.x_l + self.x_r) // 2
+        y = (self.y_t + self.y_b) // 2
         return (x, y)
 
     def intersect(self, other):
-        return (self.x1 <= other.x2 and self.x2 >= other.x1 and
-                self.y1 <= other.y2 and self.y2 >= other.y1)
+        return (self.x_l <= other.x_r and self.x_r >= other.x_l and
+                self.y_t <= other.y_b and self.y_b >= other.y_t)
