@@ -62,11 +62,17 @@ class Actor:
             self.y += ty
         return tick
 
+    def place(self, start_loc):
+        self.x, self.y = start_loc
+
     def adjacent(self, world):
         adjacent = []
         for x in range(self.x - 1, self.x + 2):
             for y in range(self.y - 1, self.y + 2):
-                adjacent.append((x, y))
+                if x == self.x and y == self.y:
+                    continue
+                else:
+                    adjacent.append((x, y))
         return adjacent
 
 class Item:
@@ -129,12 +135,14 @@ class Tile:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-    # def build_door(self):
+    def build_door(self):
+        self.update(glyph='+', color='white', physical=True, is_door=True, door_status=True)
 
     def toggle_door(self):
         if self.is_door:
             self.door_status = not self.door_status
-            self.glyph = ["+", "-"][self.door_status]
+            self.glyph = ["-", "+"][self.door_status]
+            self.physical = not self.physical
 
     def build_char(self):
         elements = ["[color={}]".format(self.color) + self.glyph]
@@ -181,27 +189,35 @@ class Map(Sequence):
         return False
 
     def register(self, actor):
-        self.layout[actor.x][actor.y].occupied = actor
+        self[actor.x][actor.y].occupied = actor
 
     def move_actor(self, actor, tx, ty):
         dx, dy = actor.x + tx, actor.y + ty
-        if not self[dx][dy].physical:
-            if not self[dx][dy].occupied:
-                self[actor.x][actor.y].occupied = None
-                self[dx][dy].occupied = actor
-                return (True, True)
-        else:
-            if self[dx][dy].door == (True, True):
-                print('door')
-                self[dx][dy].update(glyph='-', door=(True, False))
-                return (True, False)
+        if not (dx >= self.width) or (dy >= self.height):
+            print((dx, dy), (self.width, self.height))
+            if not self[dx][dy].physical:
+                if not self[dx][dy].occupied:
+                    self[actor.x][actor.y].occupied = None
+                    self[dx][dy].occupied = actor
+                    return (True, True)
+            else:
+                if self[dx][dy].door_status:
+                    self[dx][dy].toggle_door()
+                    return (True, False)
         return (False, False)
 
     def generate_map(self, width, height, num_exits):
+        self.clear_map()
         self.generate_ground(width, height)
         self.carve_rooms()
         self.carve_passages()
         self.build_features()
+
+    def clear_map(self):
+        self.layout.clear()
+        self.rooms.clear()
+        self.passages.clear()
+        self.start_loc = None
 
     def generate_ground(self, width, height):
         self.layout = [[Tile(x=x, y=y, glyph='.', color='lightest orange',
@@ -221,9 +237,8 @@ class Map(Sequence):
                 if new_room.intersect(other_room):
                     failed = True
                     break
-                if (new_room.x_r >= self.width) or (new_room.y_b >= self.height):
-                    failed = True
-                    break
+            if (new_room.x_r >= self.width) or (new_room.y_b >= self.height):
+                failed = True
             if not failed:
                 self.rooms.append(new_room)
                 if not self.start_loc:
@@ -234,11 +249,11 @@ class Map(Sequence):
                            (x == new_room.x_r) or
                            (y == new_room.y_t) or
                            (y == new_room.y_b)):
-                            self.layout[x][y].update(glyph='#', color='grey', physical=True)
+                            self[x][y].update(glyph='#', color='grey', physical=True)
                         else:
-                            self.layout[x][y].update(glyph='.', color='amber')
+                            self[x][y].update(glyph='.', color='amber')
                 x, y = new_room.x_r, new_room.y_b
-                self.layout[x][y].glyph = str(chr(64 + len(self.rooms)))
+                self[x][y].glyph = str(chr(64 + len(self.rooms)))
 
     def carve_passages(self):
         pass
@@ -254,8 +269,7 @@ class Map(Sequence):
                 x, y = (randrange(room.x_l + 1, room.x_r), room.y_b)
             elif side is 3:
                 x, y = (room.x_r, randrange(room.y_t + 1, room.y_b))
-            self.[x][y].update(glyph='+', color='white',
-                                     physical=True, door=(True, True))
+            self[x][y].build_door()
 
 class RectRoom:
     def __init__(self, x, y, w, h):

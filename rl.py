@@ -75,10 +75,13 @@ def move_actor(world, actor, to):
     tx, ty = to
     dx, dy = fx + tx, fy + ty
     if SCREEN_WIDTH > dx >= 0 and SCREEN_HEIGHT > dy >= 0:
-        if actor.move(world, tx, ty):
-            print("Good job, ya moved.")
-        else:
-            print("Can't move there, homie.")
+        actor.move(world, tx, ty)
+
+def try_door(world, actor):
+    adjacent = actor.adjacent(world)
+    for (x, y) in adjacent:
+        if world[x][y].is_door:
+            world[x][y].toggle_door()
 
 def generate_world(name):
     w = []
@@ -142,8 +145,16 @@ def main():
                 move_actor(world, pc, (-1, 1))
             elif key == TK_N:
                 move_actor(world, pc, (1, 1))
+            elif key == TK_PERIOD:
+                move_actor(world, pc, (0, 0))
             elif key == TK_C:
                 try_door(world, pc)
+            elif key == TK_R:
+                world.generate_map(world.width,
+                                   world.height,
+                                   world.num_exits)
+                pc.place(world.start_loc)
+                world.register(pc)
             elif key == (TK_MOUSE_RIGHT):
                 terminal_print(TK_MOUSE_X, TK_MOUSE_Y, "[color=yellow]X")
             elif key == (TK_MOUSE_RIGHT | TK_KEY_RELEASED):
