@@ -25,32 +25,45 @@ def render_all(character, world, offset):
     render_UI(character, world)
     render_message_bar()
 
+def find_offset(actor, world, offset):
+    global SCREEN_WIDTH, SCREEN_HEIGHT
+    offset_x, offset_y = offset
+    edge = 3
+    while world.width - edge > actor.x >= SCREEN_WIDTH + offset_x - edge:
+        offset_x += 1
+    while edge <= actor.x < offset_x + edge:
+        offset_x -= 1
+    while world.height - edge > actor.y >= SCREEN_HEIGHT + offset_y - edge:
+        offset_y += 1
+    while edge <= actor.y < offset_y + edge:
+        offset_y -= 1
+    return (offset_x, offset_y)
+
 @layer_wrap
 def render_viewport(world, offset):
     global SCREEN_WIDTH, SCREEN_HEIGHT
     terminal_layer(0)
     offset_x, offset_y = offset
-    screen_w, screen_h = SCREEN_WIDTH, SCREEN_HEIGHT
     for col, column in enumerate(world):
-        if offset_x <= col <= offset_x + screen_w:
+        if offset_x <= col < offset_x + SCREEN_WIDTH:
             for row, tile in enumerate(column):
-                if offset_y <= row <= offset_y + screen_h:
+                if offset_y <= row < offset_y + SCREEN_HEIGHT:
                     tile.build_char()
                     if tile.occupied:
-                        terminal_print(tile.x + offset_x,
-                                       tile.y + offset_y,
+                        terminal_print(tile.x - offset_x,
+                                       tile.y - offset_y,
                                        tile.occupied.char)
                     elif tile.prop:
-                        terminal_print(tile.x + offset_x,
-                                       tile.y + offset_y,
+                        terminal_print(tile.x - offset_x,
+                                       tile.y - offset_y,
                                        tile.prop.char)
                     elif tile.item:
-                        terminal_print(tile.x + offset_x,
-                                       tile.y + offset_y,
+                        terminal_print(tile.x - offset_x,
+                                       tile.y - offset_y,
                                        tile.item.char)
                     else:
-                        terminal_print(tile.x + offset_x,
-                                       tile.y + offset_y,
+                        terminal_print(tile.x - offset_x,
+                                       tile.y - offset_y,
                                        tile.char)
 
 @layer_wrap
@@ -74,7 +87,7 @@ def move_actor(world, actor, to):
     fx, fy = actor.x, actor.y
     tx, ty = to
     dx, dy = fx + tx, fy + ty
-    if SCREEN_WIDTH > dx >= 0 and SCREEN_HEIGHT > dy >= 0:
+    if world.width > dx >= 0 and world.height > dy >= 0:
         actor.move(world, tx, ty)
 
 def try_door(world, actor):
@@ -114,12 +127,13 @@ def main():
     terminal_clear()
     terminal_refresh()
     terminal_color("white")
-    offset = (0, 0)
 
     level = "town"
     world = generate_world(level)
     race = "human"
     pc = generate_player(world, race)
+    offset = find_offset(pc, world, (0, 0))
+    render_all(pc, world, offset)
 
     proceed = True
     while proceed:
@@ -159,6 +173,7 @@ def main():
                 terminal_print(TK_MOUSE_X, TK_MOUSE_Y, "[color=yellow]X")
             elif key == (TK_MOUSE_RIGHT | TK_KEY_RELEASED):
                 move_actor(world, pc, (1, 1))
+        offset = find_offset(pc, world, offset)
         render_all(pc, world, offset)
         terminal_refresh()
     terminal_close()

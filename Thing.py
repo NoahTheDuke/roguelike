@@ -116,12 +116,12 @@ class Prop:
             setattr(self, key, value)
 
 class Tile:
-    def __init__(self, x, y, glyph, color, bgcolor, physical):
+    def __init__(self, x, y, glyph, color, bkcolor, physical):
         self.x = x
         self.y = y
         self.glyph = glyph
         self.color = color
-        self.bgcolor = bgcolor
+        self.bkcolor = bkcolor
         self.physical = physical
         self.occupied = None
         self.prop = None
@@ -161,18 +161,18 @@ class Tile:
         elif self.item:
             self.item.build_char()
         color = "[color={}]".format(self.color)
-        bgcolor = "[bgcolor={}]".format(self.bgcolor)
-        elements = [color, bgcolor, self.glyph]
+        bkcolor = "[bkcolor={}]".format(self.bkcolor)
+        elements = [color, bkcolor, self.glyph]
         self.char = "".join(e for e in elements)
 
 class Map(Sequence):
     def __init__(self, name, width, height,
-                 min_rooms, max_rightooms, num_exits, level, region):
+                 min_rooms, max_rooms, num_exits, level, region):
         self.name = name
         self.width = width
         self.height = height
         self.min_rooms = min_rooms
-        self.max_rightooms = max_rightooms
+        self.max_rooms = max_rooms
         self.num_exits = num_exits
         self.level = level
         self.layout = []
@@ -235,13 +235,13 @@ class Map(Sequence):
         self.start_loc = None
 
     def generate_ground(self, width, height):
-        self.layout = [[Tile(x=x, y=y, glyph='.', color='black',
-                        bgcolor='red', physical=False)
+        self.layout = [[Tile(x=x, y=y, glyph='.', color='light green',
+                        bkcolor='black', physical=False)
                             for y in range(height)]
                                 for x in range(width)]
 
     def carve_rooms(self):
-        cur_max = randint(self.min_rooms, self.max_rightooms)
+        cur_max = randint(self.min_rooms, self.max_rooms)
         while len(self.rooms) <= cur_max:
             w, h = randint(4, 10), randint(4, 10)
             x, y = randint(0, self.width - w), randint(0, self.height - h)
