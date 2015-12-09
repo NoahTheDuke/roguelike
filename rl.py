@@ -20,7 +20,7 @@ def layer_wrap(func):
         terminal_layer(cur_layer)
     return func_wrapper
 
-def render_all(character, world, offset):
+def render_all(character, world, offset, fov_recalc):
     render_viewport(world, offset)
     render_UI(character, world)
     render_message_bar()
@@ -28,14 +28,15 @@ def render_all(character, world, offset):
 def find_offset(actor, world, offset):
     global SCREEN_WIDTH, SCREEN_HEIGHT
     offset_x, offset_y = offset
-    edge = 3
-    while world.width - edge > actor.x >= SCREEN_WIDTH + offset_x - edge:
+    edge_x = SCREEN_WIDTH // 2
+    edge_y = SCREEN_HEIGHT // 2
+    while world.width - edge_x > actor.x >= SCREEN_WIDTH + offset_x - edge_x:
         offset_x += 1
-    while edge <= actor.x < offset_x + edge:
+    while edge_x <= actor.x < offset_x + edge_x:
         offset_x -= 1
-    while world.height - edge > actor.y >= SCREEN_HEIGHT + offset_y - edge:
+    while world.height - edge_y > actor.y >= SCREEN_HEIGHT + offset_y - edge_y:
         offset_y += 1
-    while edge <= actor.y < offset_y + edge:
+    while edge_y <= actor.y < offset_y + edge_y:
         offset_y -= 1
     return (offset_x, offset_y)
 
@@ -88,7 +89,9 @@ def move_actor(world, actor, to):
     tx, ty = to
     dx, dy = fx + tx, fy + ty
     if world.width > dx >= 0 and world.height > dy >= 0:
-        actor.move(world, tx, ty)
+        tick = actor.move(world, tx, ty)
+        return tick
+    return False
 
 def try_door(world, actor):
     adjacent = actor.adjacent(world)
@@ -128,14 +131,15 @@ def main():
     terminal_refresh()
     terminal_color("white")
 
-    level = "town"
+    level = "debug"
     world = generate_world(level)
     race = "human"
     pc = generate_player(world, race)
     offset = find_offset(pc, world, (0, 0))
-    render_all(pc, world, offset)
+    render_all(pc, world, offset, False)
 
     proceed = True
+    fov_recalc = False
     while proceed:
         terminal_clear()
         key = 0
@@ -144,37 +148,32 @@ def main():
             if key == TK_CLOSE or key == TK_Q:
                 proceed = False
             elif key == TK_K:
-                move_actor(world, pc, (0, -1))
+                fov_recalc = move_actor(world, pc, (0, -1))
             elif key == TK_J:
-                move_actor(world, pc, (0, 1))
+                fov_recalc = move_actor(world, pc, (0, 1))
             elif key == TK_H:
-                move_actor(world, pc, (-1, 0))
+                fov_recalc = move_actor(world, pc, (-1, 0))
             elif key == TK_L:
-                move_actor(world, pc, (1, 0))
+                fov_recalc = move_actor(world, pc, (1, 0))
             elif key == TK_Y:
-                move_actor(world, pc, (-1, -1))
+                fov_recalc = move_actor(world, pc, (-1, -1))
             elif key == TK_U:
-                move_actor(world, pc, (1, -1))
+                fov_recalc = move_actor(world, pc, (1, -1))
             elif key == TK_B:
-                move_actor(world, pc, (-1, 1))
+                fov_recalc = move_actor(world, pc, (-1, 1))
             elif key == TK_N:
-                move_actor(world, pc, (1, 1))
+                fov_recalc = move_actor(world, pc, (1, 1))
             elif key == TK_PERIOD:
-                move_actor(world, pc, (0, 0))
+                fov_recalc = move_actor(world, pc, (0, 0))
             elif key == TK_C:
                 try_door(world, pc)
             elif key == TK_R:
-                world.generate_map(world.width,
-                                   world.height,
-                                   world.num_exits)
+                world.generate_map(world.width, world.height, world.num_exits)
                 pc.place(world.start_loc)
                 world.register(pc)
-            elif key == (TK_MOUSE_RIGHT):
-                terminal_print(TK_MOUSE_X, TK_MOUSE_Y, "[color=yellow]X")
-            elif key == (TK_MOUSE_RIGHT | TK_KEY_RELEASED):
-                move_actor(world, pc, (1, 1))
         offset = find_offset(pc, world, offset)
-        render_all(pc, world, offset)
+        render_all(pc, world, offset, fov_recalc)
+        fov_recalc = False
         terminal_refresh()
     terminal_close()
 

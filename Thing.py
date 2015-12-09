@@ -28,6 +28,10 @@ class Actor:
         self.y = y
         self.glyph = glyph
         self.color = color
+        if len(color.split()) > 1:
+            self.color_modifier = color.split()[:-1]
+        else:
+            self.color_modifier = ""
         self.physical = physical
         self.visible = visible
         self.inventory = []
@@ -41,7 +45,6 @@ class Actor:
         self.defense = defense
         self.apparel = set()
         # Finalization Methods
-        self.build_char()
         world.register(self)
 
     def __eq__(self, other):
@@ -50,9 +53,13 @@ class Actor:
                 (other.glyph, other.color,
                  other.physical, other.visible))
 
-    def build_char(self):
+    def build_char(self, fov):
         apparel = "[+]" + [x for x in self.apparel] if self.apparel else ""
-        elements = "[color={}]".format(self.color) + self.glyph + apparel
+        if fov:
+            color = fov + self.color
+        else:
+            color = " ".join((self.color_modifier, self.color))
+        elements = "[color={}]".format(color), self.glyph, apparel
         self.char = "".join(e for e in elements)
 
     def move(self, world, tx, ty):
@@ -88,8 +95,12 @@ class Item:
         return ((self.glyph, self.color, self.physical) ==
                 (other.glyph, other.color, other.physical))
 
-    def build_char(self):
-        elements = ["[color={}]".format(self.color) + self.glyph]
+    def build_char(self, fov):
+        if fov:
+            color = fov + self.color
+        else:
+            color = " ".join((self.color_modifier, self.color))
+        elements = ["[color={}]".format(color), self.glyph]
         self.char = "".join(e for e in elements)
 
 class Prop:
@@ -107,8 +118,12 @@ class Prop:
         return ((self.glyph, self.color, self.physical) ==
                 (other.glyph, other.color, other.physical))
 
-    def build_char(self):
-        elements = ["[color={}]".format(self.color) + self.glyph]
+    def build_char(self, fov):
+        if fov:
+            color = fov + self.color
+        else:
+            color = " ".join((self.color_modifier, self.color))
+        elements = ["[color={}]".format(color), self.glyph]
         self.char = "".join(e for e in elements)
 
     def update(self, **kwargs):
@@ -121,6 +136,10 @@ class Tile:
         self.y = y
         self.glyph = glyph
         self.color = color
+        if len(color.split()) > 1:
+            self.color_modifier = color.split()[:-1]
+        else:
+            self.color_modifier = ""
         self.bkcolor = bkcolor
         self.physical = physical
         self.occupied = None
@@ -153,14 +172,20 @@ class Tile:
         self.prop.glyph = ["-", "+"][self.prop.door_status]
         self.prop.physical = not self.prop.physical
 
-    def build_char(self):
+    def build_char(self, fov=False):
+        if not fov:
+            fov = "darker"
         if self.occupied:
-            self.occupied.build_char()
+            self.occupied.build_char(fov)
         elif self.prop:
-            self.prop.build_char()
+            self.prop.build_char(fov)
         elif self.item:
-            self.item.build_char()
-        color = "[color={}]".format(self.color)
+            self.item.build_char(fov)
+        if fov:
+            color = " ".join((fov, self.color))
+        else:
+            color = " ".join((self.color_modifier, self.color))
+        color = "[color={}]".format(color)
         bkcolor = "[bkcolor={}]".format(self.bkcolor)
         elements = [color, bkcolor, self.glyph]
         self.char = "".join(e for e in elements)
@@ -176,6 +201,7 @@ class Map(Sequence):
         self.num_exits = num_exits
         self.level = level
         self.layout = []
+        self.fov = []
         self.rooms = []
         self.passages = []
         self.region = region
@@ -223,7 +249,7 @@ class Map(Sequence):
 
     def generate_map(self, width, height, num_exits):
         self.clear_map()
-        self.generate_ground(width, height)
+        self.generate_ground()
         self.carve_rooms()
         self.carve_passages()
         self.build_features()
@@ -234,11 +260,12 @@ class Map(Sequence):
         self.passages.clear()
         self.start_loc = None
 
-    def generate_ground(self, width, height):
-        self.layout = [[Tile(x=x, y=y, glyph='.', color='light green',
+    def generate_ground(self):
+        self.layout = [[Tile(x=x, y=y, glyph='.', color='green',
                         bkcolor='black', physical=False)
-                            for y in range(height)]
-                                for x in range(width)]
+                            for y in range(self.height)]
+                                for x in range(self.width)]
+        self.fov = [[False for y in range(self.height)] for x in range(self.width)]
 
     def carve_rooms(self):
         cur_max = randint(self.min_rooms, self.max_rooms)
