@@ -93,12 +93,14 @@ class Item:
         self.char = "".join(e for e in elements)
 
 class Prop:
-    def __init__(self, name, x, y, glyph, color, physical):
+    def __init__(self, x, y, glyph, color, physical):
         self.x = x
         self.y = y
         self.glyph = glyph
         self.color = color
         self.physical = physical
+        self.is_door = False
+        self.door_status = False
         self.uuid = uuid4()
 
     def __eq__(self, other):
@@ -108,6 +110,10 @@ class Prop:
     def build_char(self):
         elements = ["[color={}]".format(self.color) + self.glyph]
         self.char = "".join(e for e in elements)
+
+    def update(self, **kwargs):
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
 class Tile:
     def __init__(self, x, y, glyph, color, bgcolor, physical):
@@ -120,8 +126,6 @@ class Tile:
         self.occupied = None
         self.prop = None
         self.item = None
-        self.is_door = False
-        self.door_status = False
         self.uuid = uuid4()
 
     def __eq__(self, other):
@@ -136,26 +140,39 @@ class Tile:
             setattr(self, key, value)
 
     def build_door(self):
-        self.update(glyph='+', color='white', physical=True, is_door=True, door_status=True)
+        self.update(glyph='.', physical=False)
+        self.prop = Prop(x=self.x, y=self.y, glyph='+', color='white', physical=True)
+        self.prop.update(is_door=True, door_status=True)
+
+    def check_door(self):
+        if self.prop and self.prop.is_door:
+            return True
 
     def toggle_door(self):
-        if self.is_door:
-            self.door_status = not self.door_status
-            self.glyph = ["-", "+"][self.door_status]
-            self.physical = not self.physical
+        self.prop.door_status = not self.prop.door_status
+        self.prop.glyph = ["-", "+"][self.prop.door_status]
+        self.prop.physical = not self.prop.physical
 
     def build_char(self):
-        elements = ["[color={}]".format(self.color) + self.glyph]
+        if self.occupied:
+            self.occupied.build_char()
+        elif self.prop:
+            self.prop.build_char()
+        elif self.item:
+            self.item.build_char()
+        color = "[color={}]".format(self.color)
+        bgcolor = "[bgcolor={}]".format(self.bgcolor)
+        elements = [color, bgcolor, self.glyph]
         self.char = "".join(e for e in elements)
 
 class Map(Sequence):
     def __init__(self, name, width, height,
-                 min_rooms, max_rooms, num_exits, level, region):
+                 min_rooms, max_rightooms, num_exits, level, region):
         self.name = name
         self.width = width
         self.height = height
         self.min_rooms = min_rooms
-        self.max_rooms = max_rooms
+        self.max_rightooms = max_rightooms
         self.num_exits = num_exits
         self.level = level
         self.layout = []
@@ -194,16 +211,14 @@ class Map(Sequence):
     def move_actor(self, actor, tx, ty):
         dx, dy = actor.x + tx, actor.y + ty
         if not (dx >= self.width) or (dy >= self.height):
-            print((dx, dy), (self.width, self.height))
             if not self[dx][dy].physical:
-                if not self[dx][dy].occupied:
+                if self[dx][dy].check_door() and self[dx][dy].prop.door_status:
+                    self[dx][dy].toggle_door()
+                    return (True, False)
+                elif not self[dx][dy].occupied:
                     self[actor.x][actor.y].occupied = None
                     self[dx][dy].occupied = actor
                     return (True, True)
-            else:
-                if self[dx][dy].door_status:
-                    self[dx][dy].toggle_door()
-                    return (True, False)
         return (False, False)
 
     def generate_map(self, width, height, num_exits):
@@ -220,14 +235,13 @@ class Map(Sequence):
         self.start_loc = None
 
     def generate_ground(self, width, height):
-        self.layout = [[Tile(x=x, y=y, glyph='.', color='lightest orange',
-                        bgcolor='black', physical=False)
+        self.layout = [[Tile(x=x, y=y, glyph='.', color='black',
+                        bgcolor='red', physical=False)
                             for y in range(height)]
                                 for x in range(width)]
 
     def carve_rooms(self):
-        cur_max = randint(self.min_rooms, self.max_rooms)
-        # cur_max = self.max_rooms
+        cur_max = randint(self.min_rooms, self.max_rightooms)
         while len(self.rooms) <= cur_max:
             w, h = randint(4, 10), randint(4, 10)
             x, y = randint(0, self.width - w), randint(0, self.height - h)
@@ -237,22 +251,22 @@ class Map(Sequence):
                 if new_room.intersect(other_room):
                     failed = True
                     break
-            if (new_room.x_r >= self.width) or (new_room.y_b >= self.height):
+            if (new_room.x_right >= self.width) or (new_room.y_bottom >= self.height):
                 failed = True
             if not failed:
                 self.rooms.append(new_room)
                 if not self.start_loc:
                     self.start_loc = new_room.center()
-                for x in range(new_room.x_l, new_room.x_r + 1):
-                    for y in range(new_room.y_t, new_room.y_b + 1):
-                        if ((x == new_room.x_l) or
-                           (x == new_room.x_r) or
-                           (y == new_room.y_t) or
-                           (y == new_room.y_b)):
+                for x in range(new_room.x_left, new_room.x_right + 1):
+                    for y in range(new_room.y_top, new_room.y_bottom + 1):
+                        if ((x == new_room.x_left) or
+                           (x == new_room.x_right) or
+                           (y == new_room.y_top) or
+                           (y == new_room.y_bottom)):
                             self[x][y].update(glyph='#', color='grey', physical=True)
                         else:
                             self[x][y].update(glyph='.', color='amber')
-                x, y = new_room.x_r, new_room.y_b
+                x, y = new_room.x_right, new_room.y_bottom
                 self[x][y].glyph = str(chr(64 + len(self.rooms)))
 
     def carve_passages(self):
@@ -262,27 +276,36 @@ class Map(Sequence):
         for room in self.rooms:
             side = randint(0, 3)
             if side is 0:
-                x, y = (randrange(room.x_l + 1, room.x_r), room.y_t)
+                x, y = (randrange(room.x_left + 1, room.x_right), room.y_top)
             elif side is 1:
-                x, y = (room.x_l, randrange(room.y_t + 1, room.y_b))
+                x, y = (room.x_left, randrange(room.y_top + 1, room.y_bottom))
             elif side is 2:
-                x, y = (randrange(room.x_l + 1, room.x_r), room.y_b)
+                x, y = (randrange(room.x_left + 1, room.x_right), room.y_bottom)
             elif side is 3:
-                x, y = (room.x_r, randrange(room.y_t + 1, room.y_b))
+                x, y = (room.x_right, randrange(room.y_top + 1, room.y_bottom))
             self[x][y].build_door()
 
 class RectRoom:
     def __init__(self, x, y, w, h):
-        self.x_l = x
-        self.y_t = y
-        self.x_r = x + w
-        self.y_b = y + h
+        self.x_left = x
+        self.y_top = y
+        self.x_right = x + w
+        self.y_bottom = y + h
 
     def center(self):
-        x = (self.x_l + self.x_r) // 2
-        y = (self.y_t + self.y_b) // 2
+        x = (self.x_left + self.x_right) // 2
+        y = (self.y_top + self.y_bottom) // 2
         return (x, y)
 
     def intersect(self, other):
-        return (self.x_l <= other.x_r and self.x_r >= other.x_l and
-                self.y_t <= other.y_b and self.y_b >= other.y_t)
+        return (self.x_left <= other.x_right and self.x_right >= other.x_left and
+                self.y_top <= other.y_bottom and self.y_bottom >= other.y_top)
+
+class RightAnglePassage:
+    def __init__(self, start_loc, end_loc, width):
+        self.x1, self.y1 = start_loc
+        self.x2, self.y2 = end_loc
+        self.width = width
+
+    def length(self):
+        return (abs(self.x2 - self.x1) + abs(self.y2 - self.y1))

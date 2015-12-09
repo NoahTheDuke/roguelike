@@ -28,7 +28,7 @@ def render_all(character, world, offset):
 @layer_wrap
 def render_viewport(world, offset):
     global SCREEN_WIDTH, SCREEN_HEIGHT
-    terminal_layer(5)
+    terminal_layer(0)
     offset_x, offset_y = offset
     screen_w, screen_h = SCREEN_WIDTH, SCREEN_HEIGHT
     for col, column in enumerate(world):
@@ -80,7 +80,7 @@ def move_actor(world, actor, to):
 def try_door(world, actor):
     adjacent = actor.adjacent(world)
     for (x, y) in adjacent:
-        if world[x][y].is_door:
+        if world[x][y].check_door():
             world[x][y].toggle_door()
 
 def generate_world(name):
