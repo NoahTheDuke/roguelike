@@ -20,7 +20,7 @@ def layer_wrap(func):
         terminal_layer(cur_layer)
     return func_wrapper
 
-def render_all(character, world, offset, fov_recalc):
+def render_all(character, world, offset):
     render_viewport(world, offset)
     render_UI(character, world)
     render_message_bar()
@@ -40,17 +40,17 @@ def find_offset(actor, world, offset):
         offset_y -= 1
     return (offset_x, offset_y)
 
-fov = False
+fov_toggle = False
 @layer_wrap
 def render_viewport(world, offset):
-    global SCREEN_WIDTH, SCREEN_HEIGHT, fov
+    global SCREEN_WIDTH, SCREEN_HEIGHT, fov_toggle
     terminal_layer(0)
     offset_x, offset_y = offset
     for col, column in enumerate(world):
         if offset_x <= col < offset_x + SCREEN_WIDTH:
             for row, tile in enumerate(column):
                 if offset_y <= row < offset_y + SCREEN_HEIGHT:
-                    tile.build_char(fov)
+                    tile.build_char(world.fov_map, fov_toggle)
                     if tile.occupied:
                         terminal_print(tile.x - offset_x,
                                        tile.y - offset_y,
@@ -77,6 +77,8 @@ def render_UI(character, world):
     terminal_print(loc, 1 + spacing, "Name:   [color={}]{}".format(character.color, character.name))
     terminal_print(loc, 2 + spacing, "Health: [color=red]{}".format(character.cur_health))
     terminal_print(loc, 3 + spacing, "Mana:   [color=lighter blue]{}".format(character.cur_mana))
+    terminal_print(loc, 4 + spacing, "X:      {}".format(character.x))
+    terminal_print(loc, 5 + spacing, "Y:      {}".format(character.y))
 
 @layer_wrap
 def render_message_bar():
@@ -90,8 +92,7 @@ def move_actor(world, actor, to):
     tx, ty = to
     dx, dy = fx + tx, fy + ty
     if world.width > dx >= 0 and world.height > dy >= 0:
-        return actor.move(world, tx, ty)
-    return False
+        actor.move(world, tx, ty)
 
 def try_door(world, actor):
     adjacent = actor.adjacent(world)
@@ -136,10 +137,9 @@ def main():
     race = "human"
     pc = generate_player(world, race)
     offset = find_offset(pc, world, (0, 0))
-    render_all(pc, world, offset, False)
+    render_all(pc, world, offset)
 
     proceed = True
-    fov_recalc = False
     while proceed:
         terminal_clear()
         key = 0
@@ -148,35 +148,35 @@ def main():
             if key == TK_CLOSE or key == TK_Q:
                 proceed = False
             elif key == TK_K:
-                fov_recalc = move_actor(world, pc, (0, -1))
+                move_actor(world, pc, (0, -1))
             elif key == TK_J:
-                fov_recalc = move_actor(world, pc, (0, 1))
+                move_actor(world, pc, (0, 1))
             elif key == TK_H:
-                fov_recalc = move_actor(world, pc, (-1, 0))
+                move_actor(world, pc, (-1, 0))
             elif key == TK_L:
-                fov_recalc = move_actor(world, pc, (1, 0))
+                move_actor(world, pc, (1, 0))
             elif key == TK_Y:
-                fov_recalc = move_actor(world, pc, (-1, -1))
+                move_actor(world, pc, (-1, -1))
             elif key == TK_U:
-                fov_recalc = move_actor(world, pc, (1, -1))
+                move_actor(world, pc, (1, -1))
             elif key == TK_B:
-                fov_recalc = move_actor(world, pc, (-1, 1))
+                move_actor(world, pc, (-1, 1))
             elif key == TK_N:
-                fov_recalc = move_actor(world, pc, (1, 1))
+                move_actor(world, pc, (1, 1))
             elif key == TK_PERIOD:
-                fov_recalc = move_actor(world, pc, (0, 0))
+                move_actor(world, pc, (0, 0))
             elif key == TK_C:
                 try_door(world, pc)
             elif key == TK_F:
-                global fov
-                fov = not fov
+                global fov_toggle
+                fov_toggle = not fov_toggle
+                print(fov_toggle)
             elif key == TK_R:
                 world.generate_map(world.width, world.height, world.num_exits)
                 pc.place(world.start_loc)
                 world.register(pc)
         offset = find_offset(pc, world, offset)
-        render_all(pc, world, offset, fov_recalc)
-        fov_recalc = False
+        render_all(pc, world, offset)
         terminal_refresh()
     terminal_close()
 

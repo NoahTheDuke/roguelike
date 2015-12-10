@@ -2,7 +2,7 @@ from uuid import uuid4
 from collections.abc import Sequence
 from enum import Enum
 from random import randint, randrange
-from math import atan2, sqrt, cos, sin
+from math import atan2, pi, sqrt
 
 class AutoEnum(Enum):
     def __new__(cls):
@@ -144,7 +144,14 @@ class Tile(Thing):
         self.prop.glyph = ["-", "+"][self.prop.door_status]
         self.prop.physical = not self.prop.physical
 
-    def build_char(self, within_fov=False):
+    def build_char(self, fov_map, fov_toggle):
+        if fov_toggle:
+            if (self.x, self.y) in fov_map:
+                within_fov = True
+            else:
+                within_fov = False
+        else:
+            within_fov = False
         if self.occupied:
             self.occupied.build_char(within_fov)
         elif self.item:
@@ -220,95 +227,167 @@ class Map(Sequence):
                     return (True, True)
         return (False, False)
 
+    def line(self, x0, y0, x1, y1):
+        """Bresenham's line algorithm"""
+        dx = abs(x1 - x0)
+        dy = abs(y1 - y0)
+        x, y = x0, y0
+        sx = -1 if x0 > x1 else 1
+        sy = -1 if y0 > y1 else 1
+        plot = []
+        if dx > dy:
+            err = dx / 2.0
+            while x != x1:
+                plot.append((x, y))
+                err -= dy
+                if err < 0:
+                    y += sy
+                    err += dx
+                x += sx
+        else:
+            err = dy / 2.0
+            while y != y1:
+                plot.append((x, y))
+                err -= dx
+                if err < 0:
+                    x += sx
+                    err += dy
+                y += sy
+        plot.append((x, y))
+        return plot
+
     def calculate_fov(self, actor):
         """
-        Shamelessly stolen from http://ncase.me/sight-and-light/
+        Shamelessly adapted from http://ncase.me/sight-and-light/
         """
-        unique_points = []
+        corners = []
+        wall_points = []
         for room in self.rooms:
+            wall_points.append(room.wall_points)
             for corner in room.corners:
-                if corner not in unique_points:
-                    unique_points.append(corner)
+                if corner not in corners:
+                    corners.append(corner)
 
-        unique_angles = []
-        for point in unique_points:
-            angle = atan2(point[1] - actor.y, point[0] - actor.x)
-            # angle2 = atan2(point[1] - actor.y, point[0] - actor.x)
-            # angle3 = atan2(point[1] - actor.y, point[0] - actor.x)
-            # unique_angles.extend([angle1, angle2, angle3])
-            unique_angles.append(angle)
-        print('UNIQUE ANGLE', unique_angles)
+        lines = []
+        for corner in corners:
+            lines.append(self.line(actor.x, actor.y, corner[0], corner[1]))
+            # if more x than y, it's to the left and right
+            # add one above and below
+            if abs(corner[0]) <= abs(corner[1]):
+                lines.append(self.line(actor.x, actor.y, corner[0], corner[1] - 1))
+                lines.append(self.line(actor.x, actor.y, corner[0], corner[1] + 1))
+            # otherwise, it's more y than x, so add one left and right
+            else:
+                lines.append(self.line(actor.x, actor.y, corner[0] - 1, corner[1]))
+                lines.append(self.line(actor.x, actor.y, corner[0] + 1, corner[1]))
 
-        intersects = []
-        for angle in unique_angles:
-            # Calculate dx & dy from angle
-            dx = cos(angle)
-            dy = sin(angle)
-            print(dx, dy)
-            # Ray from actor
-            ray = {'actor': {'x': actor.x, 'y': actor.y},
-                   'direction': {'x': actor.x + dx, 'y': actor.y + dy}}
-            # Find CLOSEST intersection
+        intersections = []
+        for line in lines:
             closest_intersect = None
-            for room in self.rooms:
-                intersect = self.get_intersection(ray, room)
+            for step in line:
+                intersect = []
+                for wall in wall_points:
+                    if step in wall:
+                        distance = sqrt((step[0] - actor.x) ** 2 + (step[1] - actor.y) ** 2)
+                        intersect.append((distance, step))
                 if not intersect:
                     continue
-                if not closest_intersect or intersect['param'] < closest_intersect['param']:
-                    closest_intersect = intersect
-            # // Add to list of intersects
-            intersects.append(closest_intersect)
+                if not closest_intersect:
+                    closest_intersect = min(intersect)
+                elif min(intersect)[0] < closest_intersect[0]:
+                    closest_intersect = min(intersect)
+            if closest_intersect:
+                intersections.append(closest_intersect[1])
+        polygon = []
+        for intersect in intersections:
+            if intersect not in polygon:
+                polygon.append(intersect)
+        xs = sum(x[0] for x in polygon) / len(polygon)
+        ys = sum(x[1] for x in polygon) / len(polygon)
 
-    def get_intersection(self, ray, room):
-        # // Find intersection of RAY & SEGMENT
-        # // RAY in parametric: Point + Delta*T1
-        top = (room.corners[0], room.corners[1])
-        right = (room.corners[1], room.corners[2])
-        bottom = (room.corners[2], room.corners[3])
-        left = (room.corners[3], room.corners[0])
-        walls = (top, right, bottom, left)
+        def algo(x):
+            nonlocal actor
+            return atan2(x[1] - actor.y, x[0] - actor.x)
 
-        r_px = ray['actor']['x']
-        r_py = ray['actor']['y']
-        r_dx = ray['direction']['x'] - ray['actor']['x']
-        r_dy = ray['direction']['y'] - ray['actor']['y']
+        polygon.sort(key=algo)
+        print('polygon', polygon)
+        bb = (min(polygon)[0], min(polygon, key=lambda x: x[1])[1],
+              max(polygon)[0], max(polygon, key=lambda x: x[1])[1])
+        print('bb', bb)
+        fov = []
+        for y in range(bb[1], bb[3] + 1):
+            for x in range(bb[0], bb[2] + 1):
+                if self.point_in_poly(x, y, polygon):
+                    fov.append((x, y))
+        self.fov_map = fov
 
-        for wall in walls:
-            print('wall', wall)
-            print('rdx rdy', r_dx, r_dy)
-        # // SEGMENT in parametric: Point + Delta*T2
-            s_px = wall[0][0]
-            s_py = wall[0][1]
-            s_dx = wall[1][0] - wall[0][0]
-            s_dy = wall[1][1] - wall[0][1]
-        # // Are they parallel? If so, no intersect
-            r_mag = sqrt(r_dx * r_dx + r_dy * r_dy)
-            s_mag = sqrt(s_dx * s_dx + s_dy * s_dy)
-            print('sdx, sdy', s_dx, s_dy)
-            print('rmg smg', r_mag, s_mag)
-            print('rdx / rmg', r_dx / r_mag)
-            print('sdx / smg', s_dx / s_mag)
-            print('rdy / rmg', r_dy / r_mag)
-            print('sdy / smg', s_dy / s_mag)
-            if (abs(r_dx / r_mag) == abs(s_dx / s_mag)) and ((r_dy / r_mag) == (s_dy / s_mag)):
-                # // Unit vectors are the same.
-                return None
-            # // SOLVE FOR T1 & T2
-            # // r_px+r_dx*T1 = s_px+s_dx*T2 && r_py+r_dy*T1 = s_py+s_dy*T2
-            # // ==> T1 = (s_px+s_dx*T2-r_px)/r_dx = (s_py+s_dy*T2-r_py)/r_dy
-            # // ==> s_px*r_dy + s_dx*T2*r_dy - r_px*r_dy = s_py*r_dx + s_dy*T2*r_dx - r_py*r_dx
-            # // ==> T2 = (r_dx*(s_py-r_py) + r_dy*(r_px-s_px))/(s_dx*r_dy - s_dy*r_dx)
-            T2 = (r_dx * (s_py - r_py) + r_dy * (r_px - s_px)) / (s_dx * r_dy - s_dy * r_dx);
-            T1 = (s_px + s_dx * T2 - r_px) / r_dx
-            # // Must be within parametic whatevers for RAY/SEGMENT
-            if T1 < 0:
-                return None
-            if (T2 < 0) or (T2 > 1):
-                return None
-            # // Return the POINT OF INTERSECTION
-            return { 'x': r_px + r_dx * T1,
-                     'y': r_py + r_dy * T1,
-                     'param': T1}
+    def point_in_poly(self, x, y, poly):
+        # Improved point in polygon test which includes edge
+        # and vertex points
+
+        # check if point is a vertex
+        if (x, y) in poly:
+            print('shortcut')
+            return True
+
+        # check if point is on a boundary
+        print('new', x, y)
+        poly = poly + [poly[-1]]
+        # print(poly)
+        for i in range(len(poly)):
+            p1 = None
+            p2 = None
+            if i == 0:
+                p1 = poly[0]
+                p2 = poly[1]
+            else:
+                p1 = poly[i - 1]
+                p2 = poly[i]
+            if p1[1] == p2[1]:
+                if p1[1] == y:
+                    if x >= min(p1[0], p2[0]):
+                        if x <= max(p1[0], p2[0]):
+                            return True
+            elif p1[0] == p2[0]:
+                print('p1 p2 x', p1, p2)
+                if p1[0] == x:
+                    if y >= min(p1[1], p2[1]):
+                        if y <= max(p1[1], p2[1]):
+                            return True
+        poly = poly[:-1]
+
+        n = len(poly)
+        inside = False
+
+        p1x, p1y = poly[0]
+        for i in range(n + 1):
+            p2x, p2y = poly[i % n]
+            if y > min(p1y, p2y):
+                # print('p1x, p1y', p1x, p1y)
+                # print('p2x, p2y', p2x, p2y)
+                # print('y min', y)
+                if y <= max(p1y, p2y):
+                    # print('y max', y)
+                    if x <= max(p1x, p2x):
+                        # print('x max', x)
+                        if p1y != p2y:
+                            # print('ne')
+                            xints = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+                        if p1x == p2x or x <= xints:
+                            inside = not inside
+                            # print('not', inside)
+            p1x, p1y = p2x, p2y
+
+        # print('inside?', inside)
+        return inside
+
+    def angle_from_points(self, x_orig, y_orig, x_landmark, y_landmark):
+        deltaY = y_landmark - y_orig
+        deltaX = x_landmark - x_orig
+        a = atan2(deltaY, deltaX)
+        while a < 0.0:
+            a += pi * 2
+        return a
 
     def generate_map(self, width, height, num_exits):
         self.clear_map()
@@ -331,8 +410,9 @@ class Map(Sequence):
         self.fov = [[False for y in range(self.height)] for x in range(self.width)]
 
     def carve_rooms(self):
-        cur_max = randint(self.min_rooms, self.max_rooms)
-        while len(self.rooms) <= cur_max:
+        cur_max = 1
+        # cur_max = randint(self.min_rooms, self.max_rooms)
+        while len(self.rooms) < cur_max:
             w, h = randint(4, 10), randint(4, 10)
             x, y = randint(0, self.width - w), randint(0, self.height - h)
             new_room = RectRoom(x, y, w, h)
@@ -383,13 +463,55 @@ class RectRoom:
         self.x_right = x + w
         self.y_bottom = y + h
         self.corners()
+        self.walls()
 
     def corners(self):
         top_left = (self.x_left, self.y_top)
         top_right = (self.x_right, self.y_top)
-        bottom_left = (self.x_left, self.y_bottom)
         bottom_right = (self.x_right, self.y_bottom)
+        bottom_left = (self.x_left, self.y_bottom)
         self.corners = (top_left, top_right, bottom_right, bottom_left)
+        self.corner_points = []
+        self.corner_points.extend((top_left, top_right, bottom_right, bottom_left))
+
+    def walls(self):
+        top = self.line(self.x_left, self.y_top, self.x_right, self.y_top)
+        right = self.line(self.x_right, self.y_top, self.x_right, self.y_bottom)
+        bottom = self.line(self.x_left, self.y_bottom, self.x_right, self.y_bottom)
+        left = self.line(self.x_left, self.y_top, self.x_left, self.y_bottom)
+        self.walls = (top, right, bottom, left)
+        self.wall_points = []
+        for wall in self.walls:
+            self.wall_points.extend(wall)
+
+    def line(self, x0, y0, x1, y1):
+        """Bresenham's line algorithm"""
+        dx = abs(x1 - x0)
+        dy = abs(y1 - y0)
+        x, y = x0, y0
+        sx = -1 if x0 > x1 else 1
+        sy = -1 if y0 > y1 else 1
+        plot = []
+        if dx > dy:
+            err = dx / 2.0
+            while x != x1:
+                plot.append((x, y))
+                err -= dy
+                if err < 0:
+                    y += sy
+                    err += dx
+                x += sx
+        else:
+            err = dy / 2.0
+            while y != y1:
+                plot.append((x, y))
+                err -= dx
+                if err < 0:
+                    x += sx
+                    err += dy
+                y += sy
+        plot.append((x, y))
+        return plot
 
     def center(self):
         x = (self.x_left + self.x_right) // 2

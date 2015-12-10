@@ -2,10 +2,10 @@ debug:
     name: 'debug'
     level: None
     region: start
-    width: 58
+    width: 57
     height: 36
-    min_rooms: 3
-    max_rooms: 3
+    min_rooms: 1
+    max_rooms: 1
     num_exits: 0
 town:
     name: 'town'
