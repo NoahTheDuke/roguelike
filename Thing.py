@@ -2,6 +2,7 @@ from uuid import uuid4
 from collections.abc import Sequence
 from enum import Enum
 from random import randint, randrange
+from math import atan2, sqrt, cos, sin
 
 class AutoEnum(Enum):
     def __new__(cls):
@@ -17,22 +18,41 @@ class Game_States(AutoEnum):
     OPTIONS = ()
     HISTORY = ()
 
-class Actor:
+class Thing:
+    def __init__(self, x, y, glyph, color, physical, visible=True):
+        self.x = x
+        self.y = y
+        self.glyph = glyph
+        if len(color.split()) > 1:
+            self.color_modifier, self.color = color.split()
+        else:
+            self.color = color
+            self.color_modifier = ""
+        self.physical = physical
+        self.visible = visible
+
+    def __eq__(self, other):
+        return ((self.glyph, self.color,
+                 self.physical, self.visible) ==
+                (other.glyph, other.color,
+                 other.physical, other.visible))
+
+    def build_char(self, within_fov):
+        if within_fov:
+            color = " ".join((self.color_modifier, self.color))
+        else:
+            color = "darker " + self.color
+        elements = ["[color={}]".format(color), self.glyph]
+        self.char = "".join(e for e in elements)
+
+class Actor(Thing):
     def __init__(self, world, name, x, y, glyph, color, physical,
                  visible=True, max_health=None, cur_health=None,
                  max_mana=None, cur_mana=None, attack=None, defense=None,
                  apparel=None):
         # Engine Stats
+        Thing.__init__(self, x, y, glyph, color, physical)
         self.name = name
-        self.x = x
-        self.y = y
-        self.glyph = glyph
-        self.color = color
-        if len(color.split()) > 1:
-            self.color_modifier = color.split()[:-1]
-        else:
-            self.color_modifier = ""
-        self.physical = physical
         self.visible = visible
         self.inventory = []
         self.uuid = uuid4()
@@ -47,26 +67,17 @@ class Actor:
         # Finalization Methods
         world.register(self)
 
-    def __eq__(self, other):
-        return ((self.glyph, self.color,
-                 self.physical, self.visible) ==
-                (other.glyph, other.color,
-                 other.physical, other.visible))
-
-    def build_char(self, fov):
+    def build_char(self, within_fov):
+        super().build_char(within_fov)
         apparel = "[+]" + [x for x in self.apparel] if self.apparel else ""
-        if fov:
-            color = fov + self.color
-        else:
-            color = " ".join((self.color_modifier, self.color))
-        elements = "[color={}]".format(color), self.glyph, apparel
-        self.char = "".join(e for e in elements)
+        self.char = "".join((self.char, apparel))
 
     def move(self, world, tx, ty):
         tick, moved = world.move_actor(self, tx, ty)
         if moved:
             self.x += tx
             self.y += ty
+            world.calculate_fov(self)
         return tick
 
     def place(self, start_loc):
@@ -82,66 +93,27 @@ class Actor:
                     adjacent.append((x, y))
         return adjacent
 
-class Item:
+class Item(Thing):
     def __init__(self, name, x, y, glyph, color, physical):
-        self.x = x
-        self.y = y
-        self.glyph = glyph
-        self.color = color
-        self.physical = physical
+        Thing.__init__(self, x, y, glyph, color, physical)
+        self.name = name
         self.uuid = uuid4()
 
-    def __eq__(self, other):
-        return ((self.glyph, self.color, self.physical) ==
-                (other.glyph, other.color, other.physical))
-
-    def build_char(self, fov):
-        if fov:
-            color = fov + self.color
-        else:
-            color = " ".join((self.color_modifier, self.color))
-        elements = ["[color={}]".format(color), self.glyph]
-        self.char = "".join(e for e in elements)
-
-class Prop:
+class Prop(Thing):
     def __init__(self, x, y, glyph, color, physical):
-        self.x = x
-        self.y = y
-        self.glyph = glyph
-        self.color = color
-        self.physical = physical
+        Thing.__init__(self, x, y, glyph, color, physical)
         self.is_door = False
         self.door_status = False
         self.uuid = uuid4()
-
-    def __eq__(self, other):
-        return ((self.glyph, self.color, self.physical) ==
-                (other.glyph, other.color, other.physical))
-
-    def build_char(self, fov):
-        if fov:
-            color = fov + self.color
-        else:
-            color = " ".join((self.color_modifier, self.color))
-        elements = ["[color={}]".format(color), self.glyph]
-        self.char = "".join(e for e in elements)
 
     def update(self, **kwargs):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-class Tile:
+class Tile(Thing):
     def __init__(self, x, y, glyph, color, bkcolor, physical):
-        self.x = x
-        self.y = y
-        self.glyph = glyph
-        self.color = color
-        if len(color.split()) > 1:
-            self.color_modifier = color.split()[:-1]
-        else:
-            self.color_modifier = ""
+        Thing.__init__(self, x, y, glyph, color, physical)
         self.bkcolor = bkcolor
-        self.physical = physical
         self.occupied = None
         self.prop = None
         self.item = None
@@ -172,23 +144,23 @@ class Tile:
         self.prop.glyph = ["-", "+"][self.prop.door_status]
         self.prop.physical = not self.prop.physical
 
-    def build_char(self, fov=False):
-        if not fov:
-            fov = "darker"
+    def build_char(self, within_fov=False):
         if self.occupied:
-            self.occupied.build_char(fov)
-        elif self.prop:
-            self.prop.build_char(fov)
+            self.occupied.build_char(within_fov)
         elif self.item:
-            self.item.build_char(fov)
-        if fov:
-            color = " ".join((fov, self.color))
+            self.item.build_char(within_fov)
+        elif self.prop:
+            self.prop.build_char(within_fov)
         else:
-            color = " ".join((self.color_modifier, self.color))
-        color = "[color={}]".format(color)
-        bkcolor = "[bkcolor={}]".format(self.bkcolor)
-        elements = [color, bkcolor, self.glyph]
-        self.char = "".join(e for e in elements)
+            super().build_char(within_fov)
+            if within_fov:
+                color = " ".join((self.color_modifier, self.color))
+            else:
+                color = "darker " + self.color
+            color = "[color={}]".format(color)
+            bkcolor = "[bkcolor={}]".format(self.bkcolor)
+            elements = [color, bkcolor, self.glyph]
+            self.char = "".join(e for e in elements)
 
 class Map(Sequence):
     def __init__(self, name, width, height,
@@ -201,7 +173,7 @@ class Map(Sequence):
         self.num_exits = num_exits
         self.level = level
         self.layout = []
-        self.fov = []
+        self.fov_map = set()
         self.rooms = []
         self.passages = []
         self.region = region
@@ -233,6 +205,7 @@ class Map(Sequence):
 
     def register(self, actor):
         self[actor.x][actor.y].occupied = actor
+        self.calculate_fov(actor)
 
     def move_actor(self, actor, tx, ty):
         dx, dy = actor.x + tx, actor.y + ty
@@ -246,6 +219,96 @@ class Map(Sequence):
                     self[dx][dy].occupied = actor
                     return (True, True)
         return (False, False)
+
+    def calculate_fov(self, actor):
+        """
+        Shamelessly stolen from http://ncase.me/sight-and-light/
+        """
+        unique_points = []
+        for room in self.rooms:
+            for corner in room.corners:
+                if corner not in unique_points:
+                    unique_points.append(corner)
+
+        unique_angles = []
+        for point in unique_points:
+            angle = atan2(point[1] - actor.y, point[0] - actor.x)
+            # angle2 = atan2(point[1] - actor.y, point[0] - actor.x)
+            # angle3 = atan2(point[1] - actor.y, point[0] - actor.x)
+            # unique_angles.extend([angle1, angle2, angle3])
+            unique_angles.append(angle)
+        print('UNIQUE ANGLE', unique_angles)
+
+        intersects = []
+        for angle in unique_angles:
+            # Calculate dx & dy from angle
+            dx = cos(angle)
+            dy = sin(angle)
+            print(dx, dy)
+            # Ray from actor
+            ray = {'actor': {'x': actor.x, 'y': actor.y},
+                   'direction': {'x': actor.x + dx, 'y': actor.y + dy}}
+            # Find CLOSEST intersection
+            closest_intersect = None
+            for room in self.rooms:
+                intersect = self.get_intersection(ray, room)
+                if not intersect:
+                    continue
+                if not closest_intersect or intersect['param'] < closest_intersect['param']:
+                    closest_intersect = intersect
+            # // Add to list of intersects
+            intersects.append(closest_intersect)
+
+    def get_intersection(self, ray, room):
+        # // Find intersection of RAY & SEGMENT
+        # // RAY in parametric: Point + Delta*T1
+        top = (room.corners[0], room.corners[1])
+        right = (room.corners[1], room.corners[2])
+        bottom = (room.corners[2], room.corners[3])
+        left = (room.corners[3], room.corners[0])
+        walls = (top, right, bottom, left)
+
+        r_px = ray['actor']['x']
+        r_py = ray['actor']['y']
+        r_dx = ray['direction']['x'] - ray['actor']['x']
+        r_dy = ray['direction']['y'] - ray['actor']['y']
+
+        for wall in walls:
+            print('wall', wall)
+            print('rdx rdy', r_dx, r_dy)
+        # // SEGMENT in parametric: Point + Delta*T2
+            s_px = wall[0][0]
+            s_py = wall[0][1]
+            s_dx = wall[1][0] - wall[0][0]
+            s_dy = wall[1][1] - wall[0][1]
+        # // Are they parallel? If so, no intersect
+            r_mag = sqrt(r_dx * r_dx + r_dy * r_dy)
+            s_mag = sqrt(s_dx * s_dx + s_dy * s_dy)
+            print('sdx, sdy', s_dx, s_dy)
+            print('rmg smg', r_mag, s_mag)
+            print('rdx / rmg', r_dx / r_mag)
+            print('sdx / smg', s_dx / s_mag)
+            print('rdy / rmg', r_dy / r_mag)
+            print('sdy / smg', s_dy / s_mag)
+            if (abs(r_dx / r_mag) == abs(s_dx / s_mag)) and ((r_dy / r_mag) == (s_dy / s_mag)):
+                # // Unit vectors are the same.
+                return None
+            # // SOLVE FOR T1 & T2
+            # // r_px+r_dx*T1 = s_px+s_dx*T2 && r_py+r_dy*T1 = s_py+s_dy*T2
+            # // ==> T1 = (s_px+s_dx*T2-r_px)/r_dx = (s_py+s_dy*T2-r_py)/r_dy
+            # // ==> s_px*r_dy + s_dx*T2*r_dy - r_px*r_dy = s_py*r_dx + s_dy*T2*r_dx - r_py*r_dx
+            # // ==> T2 = (r_dx*(s_py-r_py) + r_dy*(r_px-s_px))/(s_dx*r_dy - s_dy*r_dx)
+            T2 = (r_dx * (s_py - r_py) + r_dy * (r_px - s_px)) / (s_dx * r_dy - s_dy * r_dx);
+            T1 = (s_px + s_dx * T2 - r_px) / r_dx
+            # // Must be within parametic whatevers for RAY/SEGMENT
+            if T1 < 0:
+                return None
+            if (T2 < 0) or (T2 > 1):
+                return None
+            # // Return the POINT OF INTERSECTION
+            return { 'x': r_px + r_dx * T1,
+                     'y': r_py + r_dy * T1,
+                     'param': T1}
 
     def generate_map(self, width, height, num_exits):
         self.clear_map()
@@ -261,7 +324,7 @@ class Map(Sequence):
         self.start_loc = None
 
     def generate_ground(self):
-        self.layout = [[Tile(x=x, y=y, glyph='.', color='green',
+        self.layout = [[Tile(x=x, y=y, glyph='.', color='light green',
                         bkcolor='black', physical=False)
                             for y in range(self.height)]
                                 for x in range(self.width)]
@@ -295,6 +358,7 @@ class Map(Sequence):
                             self[x][y].update(glyph='.', color='amber')
                 x, y = new_room.x_right, new_room.y_bottom
                 self[x][y].glyph = str(chr(64 + len(self.rooms)))
+        self.rooms.append(RectRoom(0, 0, self.width - 1, self.height - 1))
 
     def carve_passages(self):
         pass
@@ -318,6 +382,14 @@ class RectRoom:
         self.y_top = y
         self.x_right = x + w
         self.y_bottom = y + h
+        self.corners()
+
+    def corners(self):
+        top_left = (self.x_left, self.y_top)
+        top_right = (self.x_right, self.y_top)
+        bottom_left = (self.x_left, self.y_bottom)
+        bottom_right = (self.x_right, self.y_bottom)
+        self.corners = (top_left, top_right, bottom_right, bottom_left)
 
     def center(self):
         x = (self.x_left + self.x_right) // 2

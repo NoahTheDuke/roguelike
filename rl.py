@@ -40,28 +40,29 @@ def find_offset(actor, world, offset):
         offset_y -= 1
     return (offset_x, offset_y)
 
+fov = False
 @layer_wrap
 def render_viewport(world, offset):
-    global SCREEN_WIDTH, SCREEN_HEIGHT
+    global SCREEN_WIDTH, SCREEN_HEIGHT, fov
     terminal_layer(0)
     offset_x, offset_y = offset
     for col, column in enumerate(world):
         if offset_x <= col < offset_x + SCREEN_WIDTH:
             for row, tile in enumerate(column):
                 if offset_y <= row < offset_y + SCREEN_HEIGHT:
-                    tile.build_char()
+                    tile.build_char(fov)
                     if tile.occupied:
                         terminal_print(tile.x - offset_x,
                                        tile.y - offset_y,
                                        tile.occupied.char)
-                    elif tile.prop:
-                        terminal_print(tile.x - offset_x,
-                                       tile.y - offset_y,
-                                       tile.prop.char)
                     elif tile.item:
                         terminal_print(tile.x - offset_x,
                                        tile.y - offset_y,
                                        tile.item.char)
+                    elif tile.prop:
+                        terminal_print(tile.x - offset_x,
+                                       tile.y - offset_y,
+                                       tile.prop.char)
                     else:
                         terminal_print(tile.x - offset_x,
                                        tile.y - offset_y,
@@ -89,8 +90,7 @@ def move_actor(world, actor, to):
     tx, ty = to
     dx, dy = fx + tx, fy + ty
     if world.width > dx >= 0 and world.height > dy >= 0:
-        tick = actor.move(world, tx, ty)
-        return tick
+        return actor.move(world, tx, ty)
     return False
 
 def try_door(world, actor):
@@ -167,6 +167,9 @@ def main():
                 fov_recalc = move_actor(world, pc, (0, 0))
             elif key == TK_C:
                 try_door(world, pc)
+            elif key == TK_F:
+                global fov
+                fov = not fov
             elif key == TK_R:
                 world.generate_map(world.width, world.height, world.num_exits)
                 pc.place(world.start_loc)
