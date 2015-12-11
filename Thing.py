@@ -2,7 +2,7 @@ from uuid import uuid4
 from collections.abc import Sequence
 from enum import Enum
 from random import randint, randrange
-from math import atan2, pi, sqrt
+from math import atan2, sqrt
 
 class AutoEnum(Enum):
     def __new__(cls):
@@ -77,6 +77,7 @@ class Actor(Thing):
         if moved:
             self.x += tx
             self.y += ty
+        if tick:
             world.calculate_fov(self)
         return tick
 
@@ -216,6 +217,8 @@ class Map(Sequence):
 
     def move_actor(self, actor, tx, ty):
         dx, dy = actor.x + tx, actor.y + ty
+        if tx == 0 and ty == 0:
+            return (True, False)
         if not (dx >= self.width) or (dy >= self.height):
             if not self[dx][dy].physical:
                 if self[dx][dy].check_door() and self[dx][dy].prop.door_status:
@@ -237,7 +240,7 @@ class Map(Sequence):
         plot = []
         if dx > dy:
             err = dx / 2.0
-            while x != x1:
+            while 0 <= x < self.width:
                 plot.append((x, y))
                 err -= dy
                 if err < 0:
@@ -246,7 +249,7 @@ class Map(Sequence):
                 x += sx
         else:
             err = dy / 2.0
-            while y != y1:
+            while 0 <= y < self.height:
                 plot.append((x, y))
                 err -= dx
                 if err < 0:
@@ -273,7 +276,7 @@ class Map(Sequence):
             lines.append(self.line(actor.x, actor.y, corner[0], corner[1]))
             # if more x than y, it's to the left and right
             # add one above and below
-            if abs(corner[0]) <= abs(corner[1]):
+            if abs(corner[0] - actor.x) > abs(corner[1] - actor.y):
                 lines.append(self.line(actor.x, actor.y, corner[0], corner[1] - 1))
                 lines.append(self.line(actor.x, actor.y, corner[0], corner[1] + 1))
             # otherwise, it's more y than x, so add one left and right
@@ -288,8 +291,13 @@ class Map(Sequence):
                 intersect = []
                 for wall in wall_points:
                     if step in wall:
-                        distance = sqrt((step[0] - actor.x) ** 2 + (step[1] - actor.y) ** 2)
-                        intersect.append((distance, step))
+                        if not self[step[0]][step[1]].check_door():
+                            distance = sqrt((step[0] - actor.x) ** 2 + (step[1] - actor.y) ** 2)
+                            intersect.append((distance, step))
+                        else:
+                            if self[step[0]][step[1]].prop.door_status:
+                                distance = sqrt((step[0] - actor.x) ** 2 + (step[1] - actor.y) ** 2)
+                                intersect.append((distance, step))
                 if not intersect:
                     continue
                 if not closest_intersect:
@@ -302,18 +310,14 @@ class Map(Sequence):
         for intersect in intersections:
             if intersect not in polygon:
                 polygon.append(intersect)
-        xs = sum(x[0] for x in polygon) / len(polygon)
-        ys = sum(x[1] for x in polygon) / len(polygon)
 
         def algo(x):
             nonlocal actor
             return atan2(x[1] - actor.y, x[0] - actor.x)
 
         polygon.sort(key=algo)
-        print('polygon', polygon)
         bb = (min(polygon)[0], min(polygon, key=lambda x: x[1])[1],
               max(polygon)[0], max(polygon, key=lambda x: x[1])[1])
-        print('bb', bb)
         fov = []
         for y in range(bb[1], bb[3] + 1):
             for x in range(bb[0], bb[2] + 1):
@@ -321,18 +325,18 @@ class Map(Sequence):
                     fov.append((x, y))
         self.fov_map = fov
 
-    def point_in_poly(self, x, y, poly):
+    def point_in_poly(self, x, y, poly_original):
         # Improved point in polygon test which includes edge
         # and vertex points
 
         # check if point is a vertex
-        if (x, y) in poly:
-            print('shortcut')
+        if (x, y) in poly_original:
+            # print('shortcut')
             return True
 
         # check if point is on a boundary
-        print('new', x, y)
-        poly = poly + [poly[-1]]
+        # print('new', x, y)
+        poly = poly_original + [poly_original[0]]
         # print(poly)
         for i in range(len(poly)):
             p1 = None
@@ -348,28 +352,26 @@ class Map(Sequence):
                     if x >= min(p1[0], p2[0]):
                         if x <= max(p1[0], p2[0]):
                             return True
-            elif p1[0] == p2[0]:
-                print('p1 p2 x', p1, p2)
-                if p1[0] == x:
-                    if y >= min(p1[1], p2[1]):
-                        if y <= max(p1[1], p2[1]):
-                            return True
-        poly = poly[:-1]
+            # elif p1[0] == p2[0]:
+                # print('p1 p2 x', p1, p2)
+                # if p1[0] == x:
+                    # if y >= min(p1[1], p2[1]):
+                        # if y <= max(p1[1], p2[1]):
+                            # return True
 
-        n = len(poly)
         inside = False
 
         p1x, p1y = poly[0]
-        for i in range(n + 1):
-            p2x, p2y = poly[i % n]
+        for i in range(len(poly) + 1):
+            p2x, p2y = poly[i % len(poly)]
             if y > min(p1y, p2y):
                 # print('p1x, p1y', p1x, p1y)
                 # print('p2x, p2y', p2x, p2y)
-                # print('y min', y)
+                # print('y min', y, min(p1y, p2y))
                 if y <= max(p1y, p2y):
-                    # print('y max', y)
+                    # print('y max', y, max(p1y, p2y))
                     if x <= max(p1x, p2x):
-                        # print('x max', x)
+                        # print('x max', x, max(p1x, p2x))
                         if p1y != p2y:
                             # print('ne')
                             xints = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
@@ -380,14 +382,6 @@ class Map(Sequence):
 
         # print('inside?', inside)
         return inside
-
-    def angle_from_points(self, x_orig, y_orig, x_landmark, y_landmark):
-        deltaY = y_landmark - y_orig
-        deltaX = x_landmark - x_orig
-        a = atan2(deltaY, deltaX)
-        while a < 0.0:
-            a += pi * 2
-        return a
 
     def generate_map(self, width, height, num_exits):
         self.clear_map()
@@ -410,8 +404,8 @@ class Map(Sequence):
         self.fov = [[False for y in range(self.height)] for x in range(self.width)]
 
     def carve_rooms(self):
-        cur_max = 1
-        # cur_max = randint(self.min_rooms, self.max_rooms)
+        # cur_max = 1
+        cur_max = randint(self.min_rooms, self.max_rooms)
         while len(self.rooms) < cur_max:
             w, h = randint(4, 10), randint(4, 10)
             x, y = randint(0, self.width - w), randint(0, self.height - h)
@@ -455,6 +449,7 @@ class Map(Sequence):
             elif side is 3:
                 x, y = (room.x_right, randrange(room.y_top + 1, room.y_bottom))
             self[x][y].build_door()
+            # room.wall_points.remove((x, y))
 
 class RectRoom:
     def __init__(self, x, y, w, h):

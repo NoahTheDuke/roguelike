@@ -99,6 +99,7 @@ def try_door(world, actor):
     for (x, y) in adjacent:
         if world[x][y].check_door():
             world[x][y].toggle_door()
+            actor.move(world, 0, 0)
 
 def generate_world(name):
     w = []
@@ -170,7 +171,6 @@ def main():
             elif key == TK_F:
                 global fov_toggle
                 fov_toggle = not fov_toggle
-                print(fov_toggle)
             elif key == TK_R:
                 world.generate_map(world.width, world.height, world.num_exits)
                 pc.place(world.start_loc)
