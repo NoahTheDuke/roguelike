@@ -4,6 +4,7 @@ from enum import Enum
 from random import randint, randrange
 from math import atan2, sqrt, pi
 from collections import deque
+# from itertools import chain
 
 class AutoEnum(Enum):
     def __new__(cls):
@@ -231,7 +232,7 @@ class Map(Sequence):
                     return (True, True)
         return (False, False)
 
-    def line(self, x0, y0, x1, y1):
+    def line(self, x0, y0, x1, y1, halt=False):
         """Bresenham's line algorithm"""
         dx = abs(x1 - x0)
         dy = abs(y1 - y0)
@@ -241,24 +242,40 @@ class Map(Sequence):
         plot = []
         if dx > dy:
             err = dx / 2.0
-            while x != x1:
-            # while 0 <= x < self.width:
-                plot.append((x, y))
-                err -= dy
-                if err < 0:
-                    y += sy
-                    err += dx
-                x += sx
+            if halt:
+                while x != x1:
+                    plot.append((x, y))
+                    err -= dy
+                    if err < 0:
+                        y += sy
+                        err += dx
+                    x += sx
+            else:
+                while 0 <= x < self.width:
+                    plot.append((x, y))
+                    err -= dy
+                    if err < 0:
+                        y += sy
+                        err += dx
+                    x += sx
         else:
             err = dy / 2.0
-            # while 0 <= y < self.height:
-            while y != y1:
-                plot.append((x, y))
-                err -= dx
-                if err < 0:
-                    x += sx
-                    err += dy
-                y += sy
+            if halt:
+                while y != y1:
+                    plot.append((x, y))
+                    err -= dx
+                    if err < 0:
+                        x += sx
+                        err += dy
+                    y += sy
+            else:
+                while 0 <= y < self.height:
+                    plot.append((x, y))
+                    err -= dx
+                    if err < 0:
+                        x += sx
+                        err += dy
+                    y += sy
         plot.append((x, y))
         return plot
 
@@ -276,7 +293,7 @@ class Map(Sequence):
 
         lines = []
         for corner in corners:
-            lines.append(self.line(actor.x, actor.y, corner[0], corner[1]))
+            lines.append(self.line(actor.x, actor.y, corner[0], corner[1], True))
             # if more x than y, it's to the left and right
             # add one above and below
             if abs(corner[0] - actor.x) > abs(corner[1] - actor.y):
@@ -286,6 +303,16 @@ class Map(Sequence):
             else:
                 lines.append(self.line(actor.x, actor.y, corner[0] - 1, corner[1]))
                 lines.append(self.line(actor.x, actor.y, corner[0] + 1, corner[1]))
+        # check orthogonal directions
+        lines.append(self.line(actor.x, actor.y, actor.x - 1, actor.y))
+        lines.append(self.line(actor.x, actor.y, actor.x + 1, actor.y))
+        lines.append(self.line(actor.x, actor.y, actor.x, actor.y - 1))
+        lines.append(self.line(actor.x, actor.y, actor.x, actor.y + 1))
+        # check diagonal directions
+        lines.append(self.line(actor.x, actor.y, actor.x - 1, actor.y - 1))
+        lines.append(self.line(actor.x, actor.y, actor.x + 1, actor.y - 1))
+        lines.append(self.line(actor.x, actor.y, actor.x - 1, actor.y + 1))
+        lines.append(self.line(actor.x, actor.y, actor.x + 1, actor.y + 1))
 
         intersections = []
         for line in lines:
@@ -317,9 +344,7 @@ class Map(Sequence):
             nonlocal actor
             return (atan2(point[1] - actor.y, point[0] - actor.x) + 2 * pi) % (2 * pi)
 
-        print('presort', polygon)
         polygon.sort(key=algo)
-        print('postsort', polygon)
         poly_walls = []
         for i in range(len(polygon) + 1):
             if i == 0:
@@ -330,20 +355,25 @@ class Map(Sequence):
             else:
                 v1 = polygon[i - 1]
                 v2 = polygon[i]
-            print('v1 v2', v1, v2)
-            line = self.line(v1[0], v1[1], v2[0], v2[1])
-            print('line', line)
+            line = self.line(v1[0], v1[1], v2[0], v2[1], True)
             poly_walls.extend(line)
-        poly_walls = list(set(poly_walls))
         print(poly_walls)
+        poly_final = []
+        for poly in poly_walls:
+            if poly not in poly_final:
+                poly_final.append(poly)
 
-        # bb = (min(polygon)[0], min(polygon, key=lambda x: x[1])[1],
-        # max(polygon)[0], max(polygon, key=lambda x: x[1])[1])
-        # for y in range(bb[1], bb[3] + 1):
-            # for x in range(bb[0], bb[2] + 1):
-                # if self.point_in_poly(x, y, polygon):
-                    # fov.append((x, y))
-        fov = self.iter_flood_fill(actor.x, actor.y, poly_walls)
+        bb = (min(poly_final)[0], min(poly_final, key=lambda x: x[1])[1],
+              max(poly_final)[0], max(poly_final, key=lambda x: x[1])[1])
+        fov = []
+        vertx, verty = zip(*poly_final)
+        for y in range(bb[1], bb[3] + 1):
+            for x in range(bb[0], bb[2] + 1):
+                if self.point_in_poly(x, y, vertx, verty):
+                    fov.append((x, y))
+        # fov = self.iter_flood_fill(actor.x, actor.y, poly_final)
+        # fov = list(chain.from_iterable(lines))
+        # fov = poly_walls
         self.fov_map = fov
 
     def iter_flood_fill(self, x, y, bounds):
@@ -355,7 +385,7 @@ class Map(Sequence):
             x, y = q.popleft()
             # print(x, y)
             fov.append((x, y))
-            if 0 < x - 1 <= self.width:
+            if 0 < x < self.width:
                 if (x - 1, y) not in bounds:
                     if (x - 1, y) not in fov:
                         # print('x - 1', (x - 1, y), (x - 1, y) in bounds)
@@ -364,7 +394,7 @@ class Map(Sequence):
                     if (x + 1, y) not in fov:
                         # print('x + 1', q)
                         q.append((x + 1, y))
-            if 0 < y - 1 <= self.height:
+            if 0 < y < self.height:
                 if ((x, y - 1) not in bounds) and ((x, y - 1) not in fov):
                     # print('y - 1', q)
                     q.append((x, y - 1))
@@ -373,7 +403,27 @@ class Map(Sequence):
                     q.append((x, y + 1))
         return fov
 
-    def point_in_poly(self, x, y, poly_original):
+    def point_in_poly(self, x, y, vertx, verty):
+        c = False
+        j = len(vertx) - 1
+        for i in range(len(vertx)):
+            if ((verty[i] > y) != (verty[j] > y)):
+                if (x < (vertx[j] - vertx[i]) * (y - verty[i]) / (verty[j] - verty[i]) + vertx[i]):
+                    c = not c
+            j = i
+        return c
+    # int pnpoly(int nvert, float *vertx, float *verty, float testx, float testy)
+    # {
+      # int i, j, c = 0;
+      # for (i = 0, j = nvert-1; i < nvert; j = i++) {
+        # if ( ((verty[i]>testy) != (verty[j]>testy)) &&
+            # (testx < (vertx[j]-vertx[i]) * (testy-verty[i]) / (verty[j]-verty[i]) + vertx[i]) )
+           # c = !c;
+      # }
+      # return c;
+    # }
+
+    def point_in_poly_old(self, x, y, poly_original):
         # Improved point in polygon test which includes edge
         # and vertex points
 
@@ -478,9 +528,17 @@ class Map(Sequence):
                             self[x][y].update(glyph='#', color='grey', physical=True)
                         else:
                             self[x][y].update(glyph='.', color='amber')
-                x, y = new_room.x_right, new_room.y_bottom
-                self[x][y].glyph = str(chr(64 + len(self.rooms)))
-        self.rooms.append(RectRoom(0, 0, self.width - 1, self.height - 1))
+        new_room = RectRoom(0, 0, self.width - 1, self.height - 1)
+        for x in range(new_room.x_left, new_room.x_right + 1):
+            for y in range(new_room.y_top, new_room.y_bottom + 1):
+                if ((x == new_room.x_left) or
+                   (x == new_room.x_right) or
+                   (y == new_room.y_top) or
+                   (y == new_room.y_bottom)):
+                    self[x][y].update(glyph='#', color='grey', physical=True)
+        self.rooms.append(new_room)
+                # x, y = new_room.x_right, new_room.y_bottom
+                # self[x][y].glyph = str(chr(64 + len(self.rooms)))
 
     def carve_passages(self):
         pass
@@ -497,7 +555,6 @@ class Map(Sequence):
             elif side is 3:
                 x, y = (room.x_right, randrange(room.y_top + 1, room.y_bottom))
             self[x][y].build_door()
-            # room.wall_points.remove((x, y))
 
 class RectRoom:
     def __init__(self, x, y, w, h):
