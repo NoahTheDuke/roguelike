@@ -4,7 +4,6 @@ from enum import Enum
 from random import randint, randrange
 from math import atan2, sqrt, pi
 from collections import deque
-# from itertools import chain
 
 class AutoEnum(Enum):
     def __new__(cls):
@@ -65,6 +64,7 @@ class Actor(Thing):
         self.cur_mana = cur_mana or max_mana
         self.attack = attack
         self.defense = defense
+        self.radius = 10
         self.apparel = set()
         # Finalization Methods
         world.register(self)
@@ -74,13 +74,13 @@ class Actor(Thing):
         apparel = "[+]" + [x for x in self.apparel] if self.apparel else ""
         self.char = "".join((self.char, apparel))
 
-    def move(self, world, tx, ty):
+    def move(self, world, tx, ty, square):
         tick, moved = world.move_actor(self, tx, ty)
         if moved:
             self.x += tx
             self.y += ty
         if tick:
-            world.calculate_fov(self)
+            world.calculate_fov(self, square)
         return tick
 
     def place(self, start_loc):
@@ -279,7 +279,7 @@ class Map(Sequence):
         plot.append((x, y))
         return plot
 
-    def calculate_fov(self, actor):
+    def calculate_fov(self, actor, square=False):
         """
         Shamelessly adapted from http://ncase.me/sight-and-light/
         """
@@ -319,19 +319,22 @@ class Map(Sequence):
             closest_intersect = None
             for step in line:
                 intersect = []
-                if step in wall_points:
-                    if not self[step[0]][step[1]].check_door():
-                        distance = sqrt((step[0] - actor.x) ** 2 + (step[1] - actor.y) ** 2)
-                        intersect.append((distance, step))
-                    else:
-                        if self[step[0]][step[1]].prop.door_status:
-                            distance = sqrt((step[0] - actor.x) ** 2 + (step[1] - actor.y) ** 2)
+                if square:
+                    distance = max(abs(step[0] - actor.x), abs(step[1] - actor.y))
+                else:
+                    distance = sqrt((step[0] - actor.x) ** 2 + (step[1] - actor.y) ** 2)
+                if distance <= actor.radius:
+                    if step in wall_points:
+                        if not self[step[0]][step[1]].check_door():
                             intersect.append((distance, step))
+                        else:
+                            if self[step[0]][step[1]].prop.door_status:
+                                intersect.append((distance, step))
+                elif distance >= actor.radius:
+                    intersect.append((distance, step))
                 if not intersect:
                     continue
                 if not closest_intersect:
-                    closest_intersect = min(intersect)
-                elif min(intersect)[0] < closest_intersect[0]:
                     closest_intersect = min(intersect)
             if closest_intersect:
                 intersections.append(closest_intersect[1])
@@ -357,7 +360,6 @@ class Map(Sequence):
                 v2 = polygon[i]
             line = self.line(v1[0], v1[1], v2[0], v2[1], True)
             poly_walls.extend(line)
-        print(poly_walls)
         poly_final = []
         for poly in poly_walls:
             if poly not in poly_final:
@@ -369,39 +371,11 @@ class Map(Sequence):
         vertx, verty = zip(*poly_final)
         for y in range(bb[1], bb[3] + 1):
             for x in range(bb[0], bb[2] + 1):
-                if self.point_in_poly(x, y, vertx, verty):
+                if (x, y) in poly_final:
                     fov.append((x, y))
-        # fov = self.iter_flood_fill(actor.x, actor.y, poly_final)
-        # fov = list(chain.from_iterable(lines))
-        # fov = poly_walls
+                elif self.point_in_poly(x, y, vertx, verty):
+                    fov.append((x, y))
         self.fov_map = fov
-
-    def iter_flood_fill(self, x, y, bounds):
-        fov = []
-        q = deque()
-        q.append((x, y))
-        # print(q)
-        while q:
-            x, y = q.popleft()
-            # print(x, y)
-            fov.append((x, y))
-            if 0 < x < self.width:
-                if (x - 1, y) not in bounds:
-                    if (x - 1, y) not in fov:
-                        # print('x - 1', (x - 1, y), (x - 1, y) in bounds)
-                        q.append((x - 1, y))
-                if (x + 1, y) not in bounds:
-                    if (x + 1, y) not in fov:
-                        # print('x + 1', q)
-                        q.append((x + 1, y))
-            if 0 < y < self.height:
-                if ((x, y - 1) not in bounds) and ((x, y - 1) not in fov):
-                    # print('y - 1', q)
-                    q.append((x, y - 1))
-                if ((x, y + 1) not in bounds) and ((x, y + 1) not in fov):
-                    # print('y + 1', q)
-                    q.append((x, y + 1))
-        return fov
 
     def point_in_poly(self, x, y, vertx, verty):
         c = False
@@ -412,74 +386,6 @@ class Map(Sequence):
                     c = not c
             j = i
         return c
-    # int pnpoly(int nvert, float *vertx, float *verty, float testx, float testy)
-    # {
-      # int i, j, c = 0;
-      # for (i = 0, j = nvert-1; i < nvert; j = i++) {
-        # if ( ((verty[i]>testy) != (verty[j]>testy)) &&
-            # (testx < (vertx[j]-vertx[i]) * (testy-verty[i]) / (verty[j]-verty[i]) + vertx[i]) )
-           # c = !c;
-      # }
-      # return c;
-    # }
-
-    def point_in_poly_old(self, x, y, poly_original):
-        # Improved point in polygon test which includes edge
-        # and vertex points
-
-        # check if point is a vertex
-        if (x, y) in poly_original:
-            # print('shortcut')
-            return True
-
-        # check if point is on a boundary
-        # print('new', x, y)
-        poly = poly_original + [poly_original[0]]
-        # print(poly)
-        for i in range(len(poly)):
-            p1 = None
-            p2 = None
-            if i == 0:
-                p1 = poly[0]
-                p2 = poly[1]
-            else:
-                p1 = poly[i - 1]
-                p2 = poly[i]
-            if p1[1] == p2[1]:
-                if p1[1] == y:
-                    if x >= min(p1[0], p2[0]):
-                        if x <= max(p1[0], p2[0]):
-                            return True
-            # elif p1[0] == p2[0]:
-                # print('p1 p2 x', p1, p2)
-                # if p1[0] == x:
-                    # if y >= min(p1[1], p2[1]):
-                        # if y <= max(p1[1], p2[1]):
-                            # return True
-
-        inside = False
-
-        p1x, p1y = poly[0]
-        for i in range(len(poly) + 1):
-            p2x, p2y = poly[i % len(poly)]
-            if y > min(p1y, p2y):
-                # print('p1x, p1y', p1x, p1y)
-                # print('p2x, p2y', p2x, p2y)
-                # print('y min', y, min(p1y, p2y))
-                if y <= max(p1y, p2y):
-                    # print('y max', y, max(p1y, p2y))
-                    if x <= max(p1x, p2x):
-                        # print('x max', x, max(p1x, p2x))
-                        if p1y != p2y:
-                            # print('ne')
-                            xints = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
-                        if p1x == p2x or x <= xints:
-                            inside = not inside
-                            # print('not', inside)
-            p1x, p1y = p2x, p2y
-
-        # print('inside?', inside)
-        return inside
 
     def generate_map(self, width, height, num_exits):
         self.clear_map()
@@ -502,10 +408,10 @@ class Map(Sequence):
         self.fov = [[False for y in range(self.height)] for x in range(self.width)]
 
     def carve_rooms(self):
-        cur_max = 1
+        cur_max = self.max_rooms + 5
         # cur_max = randint(self.min_rooms, self.max_rooms)
         while len(self.rooms) < cur_max:
-            w, h = randint(4, 10), randint(4, 10)
+            w, h = randint(2, 10), randint(2, 10)
             x, y = randint(0, self.width - w), randint(0, self.height - h)
             new_room = RectRoom(x, y, w, h)
             failed = False
@@ -537,8 +443,6 @@ class Map(Sequence):
                    (y == new_room.y_bottom)):
                     self[x][y].update(glyph='#', color='grey', physical=True)
         self.rooms.append(new_room)
-                # x, y = new_room.x_right, new_room.y_bottom
-                # self[x][y].glyph = str(chr(64 + len(self.rooms)))
 
     def carve_passages(self):
         pass

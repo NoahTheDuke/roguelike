@@ -43,7 +43,7 @@ def find_offset(actor, world, offset):
 fov_toggle = False
 @layer_wrap
 def render_viewport(world, offset):
-    global SCREEN_WIDTH, SCREEN_HEIGHT, fov_toggle
+    global SCREEN_WIDTH, SCREEN_HEIGHT, fov_toggle, square
     terminal_layer(0)
     offset_x, offset_y = offset
     for col, column in enumerate(world):
@@ -86,13 +86,14 @@ def render_message_bar():
     terminal_layer(15)
     terminal_print(2, SCREEN_HEIGHT, "Messages: ")
 
+square = False
 def move_actor(world, actor, to):
-    global WINDOW_WIDTH, WINDOW_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT
+    global WINDOW_WIDTH, WINDOW_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, square
     fx, fy = actor.x, actor.y
     tx, ty = to
     dx, dy = fx + tx, fy + ty
     if world.width > dx >= 0 and world.height > dy >= 0:
-        actor.move(world, tx, ty)
+        actor.move(world, tx, ty, square)
 
 def try_door(world, actor):
     adjacent = actor.adjacent(world)
@@ -171,6 +172,10 @@ def main():
             elif key == TK_F:
                 global fov_toggle
                 fov_toggle = not fov_toggle
+            elif key == TK_S:
+                global square
+                square = not square
+                move_actor(world, pc, (0, 0))
             elif key == TK_R:
                 world.generate_map(world.width, world.height, world.num_exits)
                 pc.place(world.start_loc)
