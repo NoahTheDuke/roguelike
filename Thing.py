@@ -2,7 +2,8 @@ from uuid import uuid4
 from collections.abc import Sequence
 from enum import Enum
 from random import randint, randrange
-from math import atan2, sqrt
+from math import atan2, sqrt, pi
+from collections import deque
 
 class AutoEnum(Enum):
     def __new__(cls):
@@ -240,7 +241,8 @@ class Map(Sequence):
         plot = []
         if dx > dy:
             err = dx / 2.0
-            while 0 <= x < self.width:
+            while x != x1:
+            # while 0 <= x < self.width:
                 plot.append((x, y))
                 err -= dy
                 if err < 0:
@@ -249,7 +251,8 @@ class Map(Sequence):
                 x += sx
         else:
             err = dy / 2.0
-            while 0 <= y < self.height:
+            # while 0 <= y < self.height:
+            while y != y1:
                 plot.append((x, y))
                 err -= dx
                 if err < 0:
@@ -266,7 +269,7 @@ class Map(Sequence):
         corners = []
         wall_points = []
         for room in self.rooms:
-            wall_points.append(room.wall_points)
+            wall_points.extend(room.wall_points)
             for corner in room.corners:
                 if corner not in corners:
                     corners.append(corner)
@@ -289,15 +292,14 @@ class Map(Sequence):
             closest_intersect = None
             for step in line:
                 intersect = []
-                for wall in wall_points:
-                    if step in wall:
-                        if not self[step[0]][step[1]].check_door():
+                if step in wall_points:
+                    if not self[step[0]][step[1]].check_door():
+                        distance = sqrt((step[0] - actor.x) ** 2 + (step[1] - actor.y) ** 2)
+                        intersect.append((distance, step))
+                    else:
+                        if self[step[0]][step[1]].prop.door_status:
                             distance = sqrt((step[0] - actor.x) ** 2 + (step[1] - actor.y) ** 2)
                             intersect.append((distance, step))
-                        else:
-                            if self[step[0]][step[1]].prop.door_status:
-                                distance = sqrt((step[0] - actor.x) ** 2 + (step[1] - actor.y) ** 2)
-                                intersect.append((distance, step))
                 if not intersect:
                     continue
                 if not closest_intersect:
@@ -311,19 +313,65 @@ class Map(Sequence):
             if intersect not in polygon:
                 polygon.append(intersect)
 
-        def algo(x):
+        def algo(point):
             nonlocal actor
-            return atan2(x[1] - actor.y, x[0] - actor.x)
+            return (atan2(point[1] - actor.y, point[0] - actor.x) + 2 * pi) % (2 * pi)
 
+        print('presort', polygon)
         polygon.sort(key=algo)
-        bb = (min(polygon)[0], min(polygon, key=lambda x: x[1])[1],
-              max(polygon)[0], max(polygon, key=lambda x: x[1])[1])
-        fov = []
-        for y in range(bb[1], bb[3] + 1):
-            for x in range(bb[0], bb[2] + 1):
-                if self.point_in_poly(x, y, polygon):
-                    fov.append((x, y))
+        print('postsort', polygon)
+        poly_walls = []
+        for i in range(len(polygon) + 1):
+            if i == 0:
+                continue
+            elif i == len(polygon):
+                v1 = polygon[-1]
+                v2 = polygon[0]
+            else:
+                v1 = polygon[i - 1]
+                v2 = polygon[i]
+            print('v1 v2', v1, v2)
+            line = self.line(v1[0], v1[1], v2[0], v2[1])
+            print('line', line)
+            poly_walls.extend(line)
+        poly_walls = list(set(poly_walls))
+        print(poly_walls)
+
+        # bb = (min(polygon)[0], min(polygon, key=lambda x: x[1])[1],
+        # max(polygon)[0], max(polygon, key=lambda x: x[1])[1])
+        # for y in range(bb[1], bb[3] + 1):
+            # for x in range(bb[0], bb[2] + 1):
+                # if self.point_in_poly(x, y, polygon):
+                    # fov.append((x, y))
+        fov = self.iter_flood_fill(actor.x, actor.y, poly_walls)
         self.fov_map = fov
+
+    def iter_flood_fill(self, x, y, bounds):
+        fov = []
+        q = deque()
+        q.append((x, y))
+        # print(q)
+        while q:
+            x, y = q.popleft()
+            # print(x, y)
+            fov.append((x, y))
+            if 0 < x - 1 <= self.width:
+                if (x - 1, y) not in bounds:
+                    if (x - 1, y) not in fov:
+                        # print('x - 1', (x - 1, y), (x - 1, y) in bounds)
+                        q.append((x - 1, y))
+                if (x + 1, y) not in bounds:
+                    if (x + 1, y) not in fov:
+                        # print('x + 1', q)
+                        q.append((x + 1, y))
+            if 0 < y - 1 <= self.height:
+                if ((x, y - 1) not in bounds) and ((x, y - 1) not in fov):
+                    # print('y - 1', q)
+                    q.append((x, y - 1))
+                if ((x, y + 1) not in bounds) and ((x, y + 1) not in fov):
+                    # print('y + 1', q)
+                    q.append((x, y + 1))
+        return fov
 
     def point_in_poly(self, x, y, poly_original):
         # Improved point in polygon test which includes edge
@@ -404,8 +452,8 @@ class Map(Sequence):
         self.fov = [[False for y in range(self.height)] for x in range(self.width)]
 
     def carve_rooms(self):
-        # cur_max = 1
-        cur_max = randint(self.min_rooms, self.max_rooms)
+        cur_max = 1
+        # cur_max = randint(self.min_rooms, self.max_rooms)
         while len(self.rooms) < cur_max:
             w, h = randint(4, 10), randint(4, 10)
             x, y = randint(0, self.width - w), randint(0, self.height - h)
