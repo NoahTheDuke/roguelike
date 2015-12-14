@@ -1,6 +1,7 @@
 import yaml
 from PyBearLibTerminal import *
 from Thing import Actor, Map, Game_States
+from time import perf_counter
 
 # Rendering constants
 WINDOW_WIDTH = 80
@@ -20,10 +21,13 @@ def layer_wrap(func):
         terminal_layer(cur_layer)
     return func_wrapper
 
-def render_all(character, world, offset):
+def render_all(pc, world, offset):
+    terminal_clear()
+    world.calculate_fov(pc)
     render_viewport(world, offset)
-    render_UI(character, world)
+    render_UI(pc, world)
     render_message_bar()
+    terminal_refresh()
 
 def find_offset(actor, world, offset):
     global SCREEN_WIDTH, SCREEN_HEIGHT
@@ -93,7 +97,7 @@ def move_actor(world, actor, to):
     tx, ty = to
     dx, dy = fx + tx, fy + ty
     if world.width > dx >= 0 and world.height > dy >= 0:
-        actor.move(world, tx, ty, square)
+        actor.move(world, tx, ty)
 
 def try_door(world, actor):
     adjacent = actor.adjacent(world)
@@ -122,10 +126,7 @@ def generate_player(world, race):
     return Actor(world, pc['name'], x, y, pc['char'], pc['color'], pc['physical'],
                  pc['max_health'], pc['max_mana'], pc['attack'], pc['defense'])
 
-def generate_monsters(world):
-    return True
-
-def main():
+def initialize():
     global WINDOW_WIDTH, WINDOW_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, CELLSIZE
     terminal_open()
     terminal_set("window: size={}x{}, cellsize={}, title='Roguelike';"
@@ -134,55 +135,77 @@ def main():
     terminal_refresh()
     terminal_color("white")
 
+def update(pc, world, offset, time_elapsed, time_current):
+    offset = find_offset(pc, world, offset)
+    return pc, world, offset
+
+def main():
+    initialize()
+
     level = "debug"
     world = generate_world(level)
     race = "human"
     pc = generate_player(world, race)
     offset = find_offset(pc, world, (0, 0))
-    render_all(pc, world, offset)
 
+    UPDATE_INTERVAL_MS = 0.033
+    UPDATE_PER_FRAME_LIMIT = 10
+    clock = 0
+    previous_time = perf_counter()
+    next_update = 0
     proceed = True
+
     while proceed:
-        terminal_clear()
+        current_time = perf_counter()
+        if (current_time - previous_time) > (UPDATE_INTERVAL_MS * UPDATE_PER_FRAME_LIMIT):
+            clock += UPDATE_INTERVAL_MS * UPDATE_PER_FRAME_LIMIT
+        else:
+            clock += current_time - previous_time
+        while clock >= next_update:
+            time_elapsed = UPDATE_INTERVAL_MS
+            time_current = next_update
+            pc, world, offset = update(pc, world, offset, time_elapsed, time_current)
+            next_update += UPDATE_INTERVAL_MS
+        previous_time = perf_counter()
+
+        render_all(pc, world, offset)
+
         key = 0
         while terminal_has_input():
             key = terminal_read()
             if key == TK_CLOSE or key == TK_Q:
                 proceed = False
-            elif key == TK_K:
+            elif key == TK_K | TK_KEY_RELEASED:
                 move_actor(world, pc, (0, -1))
-            elif key == TK_J:
+            elif key == TK_J | TK_KEY_RELEASED:
                 move_actor(world, pc, (0, 1))
-            elif key == TK_H:
+            elif key == TK_H | TK_KEY_RELEASED:
                 move_actor(world, pc, (-1, 0))
-            elif key == TK_L:
+            elif key == TK_L | TK_KEY_RELEASED:
                 move_actor(world, pc, (1, 0))
-            elif key == TK_Y:
+            elif key == TK_Y | TK_KEY_RELEASED:
                 move_actor(world, pc, (-1, -1))
-            elif key == TK_U:
+            elif key == TK_U | TK_KEY_RELEASED:
                 move_actor(world, pc, (1, -1))
-            elif key == TK_B:
+            elif key == TK_B | TK_KEY_RELEASED:
                 move_actor(world, pc, (-1, 1))
-            elif key == TK_N:
+            elif key == TK_N | TK_KEY_RELEASED:
                 move_actor(world, pc, (1, 1))
-            elif key == TK_PERIOD:
+            elif key == TK_PERIOD | TK_KEY_RELEASED:
                 move_actor(world, pc, (0, 0))
-            elif key == TK_C:
+            elif key == TK_C | TK_KEY_RELEASED:
                 try_door(world, pc)
-            elif key == TK_F:
+            elif key == TK_F | TK_KEY_RELEASED:
                 global fov_toggle
                 fov_toggle = not fov_toggle
-            elif key == TK_S:
-                global square
-                square = not square
-                move_actor(world, pc, (0, 0))
-            elif key == TK_R:
+            elif key == TK_S | TK_KEY_RELEASED:
+                pc.change_los()
+            elif key == TK_R | TK_KEY_RELEASED:
                 world.generate_map(world.width, world.height, world.num_exits)
                 pc.place(world.start_loc)
                 world.register(pc)
-        offset = find_offset(pc, world, offset)
-        render_all(pc, world, offset)
-        terminal_refresh()
+
+    # if proceed is False, end the program
     terminal_close()
 
 if __name__ == '__main__':

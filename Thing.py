@@ -1,23 +1,19 @@
 from uuid import uuid4
 from collections.abc import Sequence
-from enum import Enum
+from enum import IntEnum
 from random import randint, randrange
 from math import atan2, sqrt, pi
-from collections import deque
 
-class AutoEnum(Enum):
-    def __new__(cls):
-        value = len(cls.__members__) + 1
-        obj = object.__new__(cls)
-        obj._value_ = value
-        return obj
+class Game_States(IntEnum):
+    MAIN_MENU = 0
+    NEW_GAME = 1
+    IN_GAME = 2
+    OPTIONS = 3
+    HISTORY = 4
 
-class Game_States(AutoEnum):
-    MAIN_MENU = ()
-    NEW_GAME = ()
-    IN_GAME = ()
-    OPTIONS = ()
-    HISTORY = ()
+class LOS_Shape(IntEnum):
+    EUCLID = 0
+    SQUARE = 1
 
 class Thing:
     def __init__(self, x, y, glyph, color, physical, visible=True):
@@ -64,23 +60,33 @@ class Actor(Thing):
         self.cur_mana = cur_mana or max_mana
         self.attack = attack
         self.defense = defense
-        self.radius = 10
+        self.base_radius = 8
+        self.los_shape = LOS_Shape.SQUARE
         self.apparel = set()
         # Finalization Methods
+        self.change_los()
         world.register(self)
+
+    def change_los(self):
+        if self.los_shape == LOS_Shape.EUCLID:
+            self.radius = int(sqrt(((self.base_radius * 2) ** 2) / pi))
+        else:
+            self.radius = self.base_radius
+        if self.los_shape < len(LOS_Shape) - 1:
+            self.los_shape = LOS_Shape(self.los_shape + 1)
+        else:
+            self.los_shape = LOS_Shape(0)
 
     def build_char(self, within_fov):
         super().build_char(within_fov)
         apparel = "[+]" + [x for x in self.apparel] if self.apparel else ""
         self.char = "".join((self.char, apparel))
 
-    def move(self, world, tx, ty, square):
+    def move(self, world, tx, ty):
         tick, moved = world.move_actor(self, tx, ty)
         if moved:
             self.x += tx
             self.y += ty
-        if tick:
-            world.calculate_fov(self, square)
         return tick
 
     def place(self, start_loc):
@@ -215,7 +221,6 @@ class Map(Sequence):
 
     def register(self, actor):
         self[actor.x][actor.y].occupied = actor
-        self.calculate_fov(actor)
 
     def move_actor(self, actor, tx, ty):
         dx, dy = actor.x + tx, actor.y + ty
@@ -279,7 +284,7 @@ class Map(Sequence):
         plot.append((x, y))
         return plot
 
-    def calculate_fov(self, actor, square=False):
+    def calculate_fov(self, actor):
         """
         Shamelessly adapted from http://ncase.me/sight-and-light/
         """
@@ -316,28 +321,26 @@ class Map(Sequence):
 
         intersections = []
         for line in lines:
-            closest_intersect = None
             for step in line:
-                intersect = []
-                if square:
+                intersect = None
+                if actor.los_shape == LOS_Shape.EUCLID:
                     distance = max(abs(step[0] - actor.x), abs(step[1] - actor.y))
                 else:
                     distance = sqrt((step[0] - actor.x) ** 2 + (step[1] - actor.y) ** 2)
-                if distance <= actor.radius:
+                if distance < actor.radius:
                     if step in wall_points:
                         if not self[step[0]][step[1]].check_door():
-                            intersect.append((distance, step))
+                            intersect = step
                         else:
                             if self[step[0]][step[1]].prop.door_status:
-                                intersect.append((distance, step))
+                                intersect = step
                 elif distance >= actor.radius:
-                    intersect.append((distance, step))
+                    intersect = step
                 if not intersect:
                     continue
-                if not closest_intersect:
-                    closest_intersect = min(intersect)
-            if closest_intersect:
-                intersections.append(closest_intersect[1])
+                break
+            if intersect:
+                intersections.append(intersect)
         polygon = []
         for intersect in intersections:
             if intersect not in polygon:
