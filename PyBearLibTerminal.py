@@ -21,17 +21,19 @@
 #
 # Release date: 2015-03-24
 
-import sys, ctypes, numbers
+import sys
+import ctypes
+import numbers
 
 _version3 = sys.version_info >= (3, 0)
 
 _library = None
 _possible_library_names = [
-    'BearLibTerminal.dll',     # Generic Windows DLL
-    './libBearLibTerminal.so', # Local Linux SO
-    './BearLibTerminal.so',    # Local Linux SO w/o prefix
-    'libBearLibTerminal.so',   # System Linux SO
-    'BearLibTerminal.so'       # System Linux SO w/o prefix
+    'BearLibTerminal.dll',      # Generic Windows DLL
+    './libBearLibTerminal.so',  # Local Linux SO
+    './BearLibTerminal.so',     # Local Linux SO w/o prefix
+    'libBearLibTerminal.so',    # System Linux SO
+    'BearLibTerminal.so'        # System Linux SO w/o prefix
 ]
 for name in _possible_library_names:
     try:
@@ -128,11 +130,11 @@ def terminal_put_ext(x, y, dx, dy, c, corners=None):
         _library.terminal_put_ext(x, y, dx, dy, c, ctypes.cast(terminal_put_ext.corners, ctypes.POINTER(ctypes.c_uint)))
 terminal_put_ext.corners = (ctypes.c_uint32 * 4)()
 
-def terminal_pick(x, y, z = 0):
-    return _library.terminal_pick(x, y, z);
+def terminal_pick(x, y, z=0):
+    return _library.terminal_pick(x, y, z)
 
-def terminal_pick_color(x, y, z = 0):
-    return _library.terminal_pick_color(x, y, z);
+def terminal_pick_color(x, y, z=0):
+    return _library.terminal_pick_color(x, y, z)
 
 terminal_pick_bkcolor = _library.terminal_pick_bkcolor
 
@@ -168,11 +170,11 @@ terminal_peek = _library.terminal_peek
 
 def terminal_read_str(x, y, s, max):
     if _version3 or isinstance(s, unicode):
-        p = ctypes.create_unicode_buffer(s, max+1)
+        p = ctypes.create_unicode_buffer(s, max + 1)
         rc = _read_wstr(x, y, p, max)
         return rc, p.value
     else:
-        p = ctypes.create_string_buffer(s, max+1)
+        p = ctypes.create_string_buffer(s, max + 1)
         rc = _library.terminal_read_str8(x, y, p, max)
         return rc, p.value
 
@@ -183,7 +185,7 @@ _wget.restype = ctypes.c_wchar_p
 
 def terminal_get(s, default_value=None):
     if _version3 or isinstance(s, unicode):
-        return unicode(_wget(s, default_value));
+        return unicode(_wget(s, default_value))
     else:
         return str(_library.terminal_get8(s, default_value))
 
@@ -291,46 +293,46 @@ TK_SHIFT            = 0x70
 TK_CONTROL          = 0x71
 
 # Mouse events/states.
-TK_MOUSE_LEFT       = 0x80 # Buttons
+TK_MOUSE_LEFT       = 0x80  # Buttons
 TK_MOUSE_RIGHT      = 0x81
 TK_MOUSE_MIDDLE     = 0x82
 TK_MOUSE_X1         = 0x83
 TK_MOUSE_X2         = 0x84
-TK_MOUSE_MOVE       = 0x85 # Movement event
-TK_MOUSE_SCROLL     = 0x86 # Mouse scroll event
-TK_MOUSE_X          = 0x87 # Cusor position in cells
+TK_MOUSE_MOVE       = 0x85  # Movement event
+TK_MOUSE_SCROLL     = 0x86  # Mouse scroll event
+TK_MOUSE_X          = 0x87  # Cusor position in cells
 TK_MOUSE_Y          = 0x88
-TK_MOUSE_PIXEL_X    = 0x89 # Cursor position in pixels
+TK_MOUSE_PIXEL_X    = 0x89  # Cursor position in pixels
 TK_MOUSE_PIXEL_Y    = 0x8A
-TK_MOUSE_WHEEL      = 0x8B # Scroll direction and amount
-TK_MOUSE_CLICKS     = 0x8C # Number of consecutive clicks
+TK_MOUSE_WHEEL      = 0x8B  # Scroll direction and amount
+TK_MOUSE_CLICKS     = 0x8C  # Number of consecutive clicks
 
 # If key was released instead of pressed, it's code will be OR'ed with VK_KEY_RELEASED.
 TK_KEY_RELEASED     = 0x100
 
 # Virtual key-codes for internal terminal states/variables.
 # These can be accessed via terminal_state function.
-TK_WIDTH            = 0xC0 # Terminal width in cells
-TK_HEIGHT           = 0xC1 # Terminal height in cells
-TK_CELL_WIDTH       = 0xC2 # Cell width in pixels
-TK_CELL_HEIGHT      = 0xC3 # Cell height in pixels
-TK_COLOR            = 0xC4 # Current foregroung color
-TK_BKCOLOR          = 0xC5 # Current background color
-TK_LAYER            = 0xC6 # Current layer
-TK_COMPOSITION      = 0xC7 # Current composition state
-TK_CHAR             = 0xC8 # Translated ANSI code of last produced character
-TK_WCHAR            = 0xC9 # Unicode codepoint of last produced character
-TK_EVENT            = 0xCA # Last dequeued event
-TK_FULLSCREEN       = 0xCB # Fullscreen state
+TK_WIDTH            = 0xC0  # Terminal width in cells
+TK_HEIGHT           = 0xC1  # Terminal height in cells
+TK_CELL_WIDTH       = 0xC2  # Cell width in pixels
+TK_CELL_HEIGHT      = 0xC3  # Cell height in pixels
+TK_COLOR            = 0xC4  # Current foregroung color
+TK_BKCOLOR          = 0xC5  # Current background color
+TK_LAYER            = 0xC6  # Current layer
+TK_COMPOSITION      = 0xC7  # Current composition state
+TK_CHAR             = 0xC8  # Translated ANSI code of last produced character
+TK_WCHAR            = 0xC9  # Unicode codepoint of last produced character
+TK_EVENT            = 0xCA  # Last dequeued event
+TK_FULLSCREEN       = 0xCB  # Fullscreen state
 
 # Other events.
 TK_CLOSE            = 0xE0
 TK_RESIZED          = 0xE1
 
 # Generic mode enum. Used in Terminal.composition call only.
-TK_OFF              =    0
-TK_ON               =    1
+TK_OFF              = 0
+TK_ON               = 1
 
 # Input result codes for terminal_read_str function.
-TK_INPUT_NONE       =    0
-TK_INPUT_CANCELLED  =   -1
+TK_INPUT_NONE       = 0
+TK_INPUT_CANCELLED  = -1
