@@ -2,6 +2,7 @@ import yaml
 from PyBearLibTerminal import *
 from Thing import Actor, Map, Game_States
 from time import perf_counter
+import random
 
 # Rendering constants
 WINDOW_WIDTH = 80
@@ -21,40 +22,52 @@ def layer_wrap(func):
         terminal_layer(cur_layer)
     return func_wrapper
 
-def render_all(pc, world, offset):
+def render(world, pc, offset):
     terminal_clear()
     world.calculate_fov(pc)
-    render_viewport(world, offset)
-    render_UI(pc, world)
+    render_viewport(world, pc, offset)
+    render_UI(world, pc)
     render_message_bar()
     terminal_refresh()
 
-def find_offset(actor, world, offset):
+def find_offset(world, pc, offset):
+    """
+    From: http://www.roguebasin.com/index.php?title=Scrolling_map
+    Get the position of the camera in a scrolling map:
+
+     - p is the position of the player.
+     - hs is half of the screen size, and s is the full screen size.
+     - m is the size of the map.
+    """
     global SCREEN_WIDTH, SCREEN_HEIGHT
     offset_x, offset_y = offset
-    edge_x = SCREEN_WIDTH // 2
-    edge_y = SCREEN_HEIGHT // 2
-    while world.width - edge_x > actor.x >= SCREEN_WIDTH + offset_x - edge_x:
-        offset_x += 1
-    while edge_x <= actor.x < offset_x + edge_x:
-        offset_x -= 1
-    while world.height - edge_y > actor.y >= SCREEN_HEIGHT + offset_y - edge_y:
-        offset_y += 1
-    while edge_y <= actor.y < offset_y + edge_y:
-        offset_y -= 1
+    center_x = SCREEN_WIDTH // 2
+    center_y = SCREEN_HEIGHT // 2
+
+    if pc.x < center_x:
+        offset_x = 0
+    elif pc.x > world.width - center_x:
+        offset_x = world.width - SCREEN_WIDTH
+    else:
+        offset_x = pc.x - center_x
+    if pc.y < center_y:
+        offset_y = 0
+    elif pc.y > world.height - center_y:
+        offset_y = world.height - SCREEN_HEIGHT
+    else:
+        offset_y = pc.y - center_y
     return (offset_x, offset_y)
 
-fov_toggle = False
 @layer_wrap
-def render_viewport(world, offset):
-    global SCREEN_WIDTH, SCREEN_HEIGHT, fov_toggle, square
+def render_viewport(world, pc, offset):
+    global SCREEN_WIDTH, SCREEN_HEIGHT
     terminal_layer(0)
     offset_x, offset_y = offset
     for col, column in enumerate(world):
         if offset_x <= col < offset_x + SCREEN_WIDTH:
             for row, tile in enumerate(column):
                 if offset_y <= row < offset_y + SCREEN_HEIGHT:
-                    tile.build_char(world.fov_map, fov_toggle)
+                    tile.build_char(world.fov_map, pc.fov_toggle)
                     if tile.occupied:
                         terminal_print(tile.x - offset_x,
                                        tile.y - offset_y,
@@ -73,16 +86,16 @@ def render_viewport(world, offset):
                                        tile.char)
 
 @layer_wrap
-def render_UI(character, world):
+def render_UI(world, pc):
     global SCREEN_WIDTH, SCREEN_HEIGHT
     spacing = 0
     loc = SCREEN_WIDTH + 1
     terminal_layer(10)
-    terminal_print(loc, 1 + spacing, "Name:   [color={}]{}".format(character.color, character.name))
-    terminal_print(loc, 2 + spacing, "Health: [color=red]{}".format(character.cur_health))
-    terminal_print(loc, 3 + spacing, "Mana:   [color=lighter blue]{}".format(character.cur_mana))
-    terminal_print(loc, 4 + spacing, "X:      {}".format(character.x))
-    terminal_print(loc, 5 + spacing, "Y:      {}".format(character.y))
+    terminal_print(loc, 1 + spacing, "Name:   [color={}]{}".format(pc.color, pc.name))
+    terminal_print(loc, 2 + spacing, "Health: [color=red]{}".format(pc.cur_health))
+    terminal_print(loc, 3 + spacing, "Mana:   [color=lighter blue]{}".format(pc.cur_mana))
+    terminal_print(loc, 4 + spacing, "X:      {}".format(pc.x))
+    terminal_print(loc, 5 + spacing, "Y:      {}".format(pc.y))
 
 @layer_wrap
 def render_message_bar():
@@ -91,20 +104,20 @@ def render_message_bar():
     terminal_print(2, SCREEN_HEIGHT, "Messages: ")
 
 square = False
-def move_actor(world, actor, to):
+def move_actor(world, pc, to):
     global WINDOW_WIDTH, WINDOW_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, square
-    fx, fy = actor.x, actor.y
+    fx, fy = pc.x, pc.y
     tx, ty = to
     dx, dy = fx + tx, fy + ty
     if world.width > dx >= 0 and world.height > dy >= 0:
-        actor.move(world, tx, ty)
+        pc.move(world, tx, ty)
 
-def try_door(world, actor):
-    adjacent = actor.adjacent(world)
+def try_door(world, pc):
+    adjacent = pc.adjacent(world)
     for (x, y) in adjacent:
         if world[x][y].check_door():
             world[x][y].toggle_door()
-            actor.move(world, 0, 0)
+            pc.move(world, 0, 0)
 
 def generate_world(name):
     w = []
@@ -126,6 +139,11 @@ def generate_player(world, race):
     return Actor(world, pc['name'], x, y, pc['char'], pc['color'], pc['physical'],
                  pc['max_health'], pc['max_mana'], pc['attack'], pc['defense'])
 
+def generate_monsters(world):
+    with open('data/monsters.yaml', 'r') as monsters_yaml:
+        monsters = yaml.load(monsters_yaml)
+    print(monsters)
+
 def initialize():
     global WINDOW_WIDTH, WINDOW_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, CELLSIZE
     terminal_open()
@@ -134,19 +152,51 @@ def initialize():
     terminal_clear()
     terminal_refresh()
     terminal_color("white")
+    random.seed(2)
 
-def update(pc, world, offset, time_elapsed, time_current):
-    offset = find_offset(pc, world, offset)
-    return pc, world, offset
+def update(world, pc, offset, time_elapsed, time_current):
+    offset = find_offset(world, pc, offset)
+    return world, pc, offset
+
+def process_input(key, world, pc):
+    if key == TK_K | TK_KEY_RELEASED:
+        move_actor(world, pc, (0, -1))
+    elif key == TK_J | TK_KEY_RELEASED:
+        move_actor(world, pc, (0, 1))
+    elif key == TK_H | TK_KEY_RELEASED:
+        move_actor(world, pc, (-1, 0))
+    elif key == TK_L | TK_KEY_RELEASED:
+        move_actor(world, pc, (1, 0))
+    elif key == TK_Y | TK_KEY_RELEASED:
+        move_actor(world, pc, (-1, -1))
+    elif key == TK_U | TK_KEY_RELEASED:
+        move_actor(world, pc, (1, -1))
+    elif key == TK_B | TK_KEY_RELEASED:
+        move_actor(world, pc, (-1, 1))
+    elif key == TK_N | TK_KEY_RELEASED:
+        move_actor(world, pc, (1, 1))
+    elif key == TK_PERIOD | TK_KEY_RELEASED:
+        move_actor(world, pc, (0, 0))
+    elif key == TK_C | TK_KEY_RELEASED:
+        try_door(world, pc)
+    elif key == TK_F | TK_KEY_RELEASED:
+        pc.fov_toggle = not pc.fov_toggle
+    elif key == TK_S | TK_KEY_RELEASED:
+        pc.change_los()
+    elif key == TK_R | TK_KEY_RELEASED:
+        world.generate_map(world.width, world.height, world.num_exits)
+        pc.place(world.start_loc)
+        world.register(pc)
+
 
 def main():
     initialize()
 
-    level = "debug"
+    level = 'town'
     world = generate_world(level)
-    race = "human"
+    race = 'human'
     pc = generate_player(world, race)
-    offset = find_offset(pc, world, (0, 0))
+    offset = find_offset(world, pc, (0, 0))
 
     UPDATE_INTERVAL_MS = 0.033
     UPDATE_PER_FRAME_LIMIT = 10
@@ -164,46 +214,19 @@ def main():
         while clock >= next_update:
             time_elapsed = UPDATE_INTERVAL_MS
             time_current = next_update
-            pc, world, offset = update(pc, world, offset, time_elapsed, time_current)
+            world, pc, offset = update(world, pc, offset, time_elapsed, time_current)
             next_update += UPDATE_INTERVAL_MS
         previous_time = perf_counter()
 
-        render_all(pc, world, offset)
+        render(world, pc, offset)
 
         key = 0
         while terminal_has_input():
             key = terminal_read()
             if key == TK_CLOSE or key == TK_Q:
                 proceed = False
-            elif key == TK_K | TK_KEY_RELEASED:
-                move_actor(world, pc, (0, -1))
-            elif key == TK_J | TK_KEY_RELEASED:
-                move_actor(world, pc, (0, 1))
-            elif key == TK_H | TK_KEY_RELEASED:
-                move_actor(world, pc, (-1, 0))
-            elif key == TK_L | TK_KEY_RELEASED:
-                move_actor(world, pc, (1, 0))
-            elif key == TK_Y | TK_KEY_RELEASED:
-                move_actor(world, pc, (-1, -1))
-            elif key == TK_U | TK_KEY_RELEASED:
-                move_actor(world, pc, (1, -1))
-            elif key == TK_B | TK_KEY_RELEASED:
-                move_actor(world, pc, (-1, 1))
-            elif key == TK_N | TK_KEY_RELEASED:
-                move_actor(world, pc, (1, 1))
-            elif key == TK_PERIOD | TK_KEY_RELEASED:
-                move_actor(world, pc, (0, 0))
-            elif key == TK_C | TK_KEY_RELEASED:
-                try_door(world, pc)
-            elif key == TK_F | TK_KEY_RELEASED:
-                global fov_toggle
-                fov_toggle = not fov_toggle
-            elif key == TK_S | TK_KEY_RELEASED:
-                pc.change_los()
-            elif key == TK_R | TK_KEY_RELEASED:
-                world.generate_map(world.width, world.height, world.num_exits)
-                pc.place(world.start_loc)
-                world.register(pc)
+            else:
+                process_input(key, world, pc)
 
     # if proceed is False, end the program
     terminal_close()

@@ -22,6 +22,7 @@ class Thing:
         self.glyph = glyph
         if len(color.split()) > 1:
             self.color_modifier, self.color = color.split()
+            self.color_modifier += ' '
         else:
             self.color = color
             self.color_modifier = ""
@@ -36,7 +37,7 @@ class Thing:
 
     def build_char(self, within_fov):
         if within_fov:
-            color = " ".join((self.color_modifier, self.color))
+            color = "".join((self.color_modifier, self.color))
         else:
             color = "darker " + self.color
         elements = ["[color={}]".format(color), self.glyph]
@@ -61,21 +62,22 @@ class Actor(Thing):
         self.attack = attack
         self.defense = defense
         self.base_radius = 8
+        self.radius = self.base_radius
         self.los_shape = LOS_Shape.SQUARE
+        self.fov_toggle = True
         self.apparel = set()
         # Finalization Methods
-        self.change_los()
         world.register(self)
 
     def change_los(self):
-        if self.los_shape == LOS_Shape.EUCLID:
-            self.radius = int(sqrt(((self.base_radius * 2) ** 2) / pi))
-        else:
-            self.radius = self.base_radius
         if self.los_shape < len(LOS_Shape) - 1:
             self.los_shape = LOS_Shape(self.los_shape + 1)
         else:
             self.los_shape = LOS_Shape(0)
+        if self.los_shape == LOS_Shape.EUCLID:
+            self.radius = sqrt(((self.base_radius * 2) ** 2) / pi)
+        else:
+            self.radius = self.base_radius
 
     def build_char(self, within_fov):
         super().build_char(within_fov)
@@ -133,7 +135,16 @@ class Tile(Thing):
                 (other.glyph, other.color, other.physical, other.door[0]))
 
     def __str__(self):
-        return "x: {}, y: {}, glyph: {}, char: {}, color: {}, physical: {}, occupied: {}, prop: {}, item: {}, uuid: {}".format(self.x, self.y, self.glyph, self.char, self.color, self.physical, self.occupied, self.prop, self.item, self.uuid)
+        return "x: {}, "
+        "y: {}, "
+        "glyph: {}, "
+        "char: {}, "
+        "color: {}, "
+        "physical: {}, "
+        "occupied: {}, "
+        "prop: {}, "
+        "item: {}, "
+        "uuid: {}".format(self.x, self.y, self.glyph, self.char, self.color, self.physical, self.occupied, self.prop, self.item, self.uuid)
 
     def update(self, **kwargs):
         for key, value in kwargs.items():
@@ -154,13 +165,14 @@ class Tile(Thing):
         self.prop.physical = not self.prop.physical
 
     def build_char(self, fov_map, fov_toggle):
+        # Only for debugging purposes. In production, this won't be accessible.
         if fov_toggle:
             if (self.x, self.y) in fov_map:
                 within_fov = True
             else:
                 within_fov = False
         else:
-            within_fov = False
+            within_fov = True
         if self.occupied:
             self.occupied.build_char(within_fov)
         elif self.item:
@@ -170,7 +182,7 @@ class Tile(Thing):
         else:
             super().build_char(within_fov)
             if within_fov:
-                color = " ".join((self.color_modifier, self.color))
+                color = "".join((self.color_modifier, self.color))
             else:
                 color = "darker " + self.color
             color = "[color={}]".format(color)
@@ -286,65 +298,56 @@ class Map(Sequence):
 
     def calculate_fov(self, actor):
         """
-        Shamelessly adapted from http://ncase.me/sight-and-light/
+        Adapted from http://ncase.me/sight-and-light/
+        Notable changes: Instead of building a polygon from all possible
+        corners, instead build from intersecting elements at the edge of
+        the radius of line-of-sight.
+        Unchanged is the construction of a polygon for the boundary and
+        filling it in using point-in-polygon.
         """
-        corners = []
         wall_points = []
         for room in self.rooms:
             wall_points.extend(room.wall_points)
-            for corner in room.corners:
-                if corner not in corners:
-                    corners.append(corner)
 
+        vision_boundary = RectRoom(actor.x - actor.radius,
+                                   actor.y - actor.radius,
+                                   actor.x + actor.radius,
+                                   actor.y + actor.radius)
         lines = []
-        for corner in corners:
-            lines.append(self.line(actor.x, actor.y, corner[0], corner[1], True))
-            # if more x than y, it's to the left and right
-            # add one above and below
-            if abs(corner[0] - actor.x) > abs(corner[1] - actor.y):
-                lines.append(self.line(actor.x, actor.y, corner[0], corner[1] - 1))
-                lines.append(self.line(actor.x, actor.y, corner[0], corner[1] + 1))
-            # otherwise, it's more y than x, so add one left and right
-            else:
-                lines.append(self.line(actor.x, actor.y, corner[0] - 1, corner[1]))
-                lines.append(self.line(actor.x, actor.y, corner[0] + 1, corner[1]))
-        # check orthogonal directions
-        lines.append(self.line(actor.x, actor.y, actor.x - 1, actor.y))
-        lines.append(self.line(actor.x, actor.y, actor.x + 1, actor.y))
-        lines.append(self.line(actor.x, actor.y, actor.x, actor.y - 1))
-        lines.append(self.line(actor.x, actor.y, actor.x, actor.y + 1))
-        # check diagonal directions
-        lines.append(self.line(actor.x, actor.y, actor.x - 1, actor.y - 1))
-        lines.append(self.line(actor.x, actor.y, actor.x + 1, actor.y - 1))
-        lines.append(self.line(actor.x, actor.y, actor.x - 1, actor.y + 1))
-        lines.append(self.line(actor.x, actor.y, actor.x + 1, actor.y + 1))
+        line = vision_boundary.wall_points
+        for point in line:
+            lines.append(self.line(actor.x, actor.y, point[0], point[1]))
 
-        intersections = []
+        polygon = []
         for line in lines:
             for step in line:
-                intersect = None
+                intersection = None
+                # No friggin need to repeatedly check the origin.
+                if (actor.x, actor.y) == step:
+                    continue
+                # Only for debugging purposes. Will probably just be square
+                # in the final game. Who knows, though? yolo
+                # Also, these math bits are weird. I don't know that I need
+                # them.
                 if actor.los_shape == LOS_Shape.EUCLID:
-                    distance = max(abs(step[0] - actor.x), abs(step[1] - actor.y))
-                else:
                     distance = sqrt((step[0] - actor.x) ** 2 + (step[1] - actor.y) ** 2)
+                else:
+                    distance = max(abs(step[0] - actor.x), abs(step[1] - actor.y))
                 if distance < actor.radius:
                     if step in wall_points:
                         if not self[step[0]][step[1]].check_door():
-                            intersect = step
+                            intersection = step
                         else:
                             if self[step[0]][step[1]].prop.door_status:
-                                intersect = step
+                                intersection = step
                 elif distance >= actor.radius:
-                    intersect = step
-                if not intersect:
+                    intersection = step
+                if not intersection:
                     continue
                 break
-            if intersect:
-                intersections.append(intersect)
-        polygon = []
-        for intersect in intersections:
-            if intersect not in polygon:
-                polygon.append(intersect)
+            if intersection:
+                if intersection not in polygon:
+                    polygon.append(intersection)
 
         def algo(point):
             nonlocal actor
@@ -362,25 +365,34 @@ class Map(Sequence):
                 v1 = polygon[i - 1]
                 v2 = polygon[i]
             line = self.line(v1[0], v1[1], v2[0], v2[1], True)
-            poly_walls.extend(line)
-        poly_final = []
-        for poly in poly_walls:
-            if poly not in poly_final:
-                poly_final.append(poly)
+            for tile in line:
+                if tile not in poly_walls:
+                    poly_walls.extend(line)
 
-        bb = (min(poly_final)[0], min(poly_final, key=lambda x: x[1])[1],
-              max(poly_final)[0], max(poly_final, key=lambda x: x[1])[1])
+        # bounding box: it's the enclosing box of possible tiles that need
+        # to be checked for point-in-polygon. Probably a faster method,
+        # but yolo.
+        bb = (min(poly_walls)[0], min(poly_walls, key=lambda x: x[1])[1],
+              max(poly_walls)[0], max(poly_walls, key=lambda x: x[1])[1])
         fov = []
-        vertx, verty = zip(*poly_final)
+        vertx, verty = zip(*poly_walls)
         for y in range(bb[1], bb[3] + 1):
             for x in range(bb[0], bb[2] + 1):
-                if (x, y) in poly_final:
+                # Sanity check: Obviously the walls are visible.
+                if (x, y) in poly_walls:
                     fov.append((x, y))
                 elif self.point_in_poly(x, y, vertx, verty):
                     fov.append((x, y))
         self.fov_map = fov
 
     def point_in_poly(self, x, y, vertx, verty):
+        """
+        Adapted from:
+        https://www.ecse.rpi.edu/Homepages/wrf/Research/Short_Notes/pnpoly.html
+        I could have changed it to use a bounding box, but I think the
+        zip(*poly_walls) method is the fastest way to do it. Works well enough
+        for me right now.
+        """
         c = False
         j = len(vertx) - 1
         for i in range(len(vertx)):
@@ -404,7 +416,7 @@ class Map(Sequence):
         self.start_loc = None
 
     def generate_ground(self):
-        self.layout = [[Tile(x=x, y=y, glyph='.', color='light green',
+        self.layout = [[Tile(x=x, y=y, glyph='.', color='green',
                         bkcolor='black', physical=False)
                             for y in range(self.height)]
                                 for x in range(self.width)]
