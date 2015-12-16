@@ -1,7 +1,7 @@
 human:
     name: 'Butts'
     char: '@'
-    color: red
+    color: white
     physical: True
     max_health: 20
     max_mana: 10

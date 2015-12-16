@@ -82,7 +82,7 @@ class Actor(Thing):
         self.base_radius = 8
         self.radius = self.base_radius
         self.los_shape = LOS_Shape.SQUARE
-        self.fov_toggle = True
+        self.fog_toggle = True
         self.viewed_map = set()
         self.apparel = set()
         # Finalization Methods
@@ -189,9 +189,9 @@ class Tile(Thing):
         self.prop.glyph = ["-", "+"][self.prop.door_status]
         self.prop.physical = not self.prop.physical
 
-    def build_char(self, fov_map, fov_toggle=True):
+    def build_char(self, fov_map, fog_toggle=True):
         # Only for debugging purposes. In production, this won't be accessible.
-        if fov_toggle:
+        if fog_toggle:
             if (self.x, self.y) in fov_map:
                 within_fov = True
             else:

@@ -1,6 +1,6 @@
 import yaml
 import PyBearLibTerminal as blt
-from Thing import Actor, Map, Game_States
+from Thing import Actor, Map, Game_States, COLOR
 from time import perf_counter
 import random
 
@@ -26,7 +26,8 @@ def layer_wrap(func):
 
 def render(world, pc, offset):
     blt.clear()
-    world.calculate_fov(pc)
+    if pc.fog_toggle:
+        world.calculate_fov(pc)
     render_viewport(world, pc, offset)
     render_UI(world, pc)
     render_message_bar()
@@ -71,25 +72,25 @@ def render_viewport(world, pc, offset):
         if offset_x <= col < offset_x + SCREEN_WIDTH:
             for row, tile in enumerate(column):
                 if offset_y <= row < offset_y + SCREEN_HEIGHT:
-                    if (tile.x, tile.y) in pc.viewed_map:
+                    if (tile.x, tile.y) in pc.viewed_map or not pc.fog_toggle:
                         tile.build_char(world.fov_map,
-                                        pc.fov_toggle)
+                                        pc.fog_toggle)
                         if tile.occupied:
-                            blt.print(tile.x - offset_x,
-                                      tile.y - offset_y,
-                                      tile.occupied.char)
+                            blt.print_(tile.x - offset_x,
+                                       tile.y - offset_y,
+                                       tile.occupied.char)
                         elif tile.item:
-                            blt.print(tile.x - offset_x,
-                                      tile.y - offset_y,
-                                      tile.item.char)
+                            blt.print_(tile.x - offset_x,
+                                       tile.y - offset_y,
+                                       tile.item.char)
                         elif tile.prop:
-                            blt.print(tile.x - offset_x,
-                                      tile.y - offset_y,
-                                      tile.prop.char)
+                            blt.print_(tile.x - offset_x,
+                                       tile.y - offset_y,
+                                       tile.prop.char)
                         else:
-                            blt.print(tile.x - offset_x,
-                                      tile.y - offset_y,
-                                      tile.char)
+                            blt.print_(tile.x - offset_x,
+                                       tile.y - offset_y,
+                                       tile.char)
 
 
 @layer_wrap
@@ -98,21 +99,21 @@ def render_UI(world, pc):
     spacing = 0
     loc = SCREEN_WIDTH + 1
     blt.layer(10)
-    blt.print(loc, 1 + spacing, "Name:   [color={}]{}".format(
+    blt.print_(loc, 1 + spacing, "Name:   [color={}]{}".format(
         pc.color, pc.name))
-    blt.print(loc, 2 + spacing, "Health: [color=red]{}".format(
-        pc.cur_health))
-    blt.print(loc, 3 + spacing, "Mana:   [color=lighter blue]{}".format(
-        pc.cur_mana))
-    blt.print(loc, 4 + spacing, "X:      {}".format(pc.x))
-    blt.print(loc, 5 + spacing, "Y:      {}".format(pc.y))
+    blt.print_(loc, 2 + spacing, "Health: [color={}]{}".format(
+        COLOR['pink'], pc.cur_health))
+    blt.print_(loc, 3 + spacing, "Mana:   [color={}]{}".format(
+        COLOR['blue'], pc.cur_mana))
+    blt.print_(loc, 4 + spacing, "X:      {}".format(pc.x))
+    blt.print_(loc, 5 + spacing, "Y:      {}".format(pc.y))
 
 
 @layer_wrap
 def render_message_bar():
     global SCREEN_WIDTH, SCREEN_HEIGHT
     blt.layer(15)
-    blt.print(2, SCREEN_HEIGHT, "Messages: ")
+    blt.print_(2, SCREEN_HEIGHT, "Messages: ")
 
 square = False
 
@@ -165,10 +166,10 @@ def generate_monsters(world):
 
 def initialize():
     global WINDOW_WIDTH, WINDOW_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, CELLSIZE
-    blt.open()
-    blt.set("window: size={}x{}, cellsize={}, title='Roguelike';"
-            "font: default".format(
-                str(WINDOW_WIDTH), str(WINDOW_HEIGHT), CELLSIZE))
+    blt.open_()
+    blt.set_("window: size={}x{}, cellsize={}, title='Roguelike';"
+             "font: default".format(
+                 str(WINDOW_WIDTH), str(WINDOW_HEIGHT), CELLSIZE))
     blt.clear()
     blt.refresh()
     blt.color("white")
@@ -202,7 +203,7 @@ def process_input(key, world, pc):
     elif key == blt.TK_C | blt.TK_KEY_RELEASED:
         try_door(world, pc)
     elif key == blt.TK_F | blt.TK_KEY_RELEASED:
-        pc.fov_toggle = not pc.fov_toggle
+        pc.fog_toggle = not pc.fog_toggle
     elif key == blt.TK_S | blt.TK_KEY_RELEASED:
         pc.change_los()
     elif key == blt.TK_R | blt.TK_KEY_RELEASED:

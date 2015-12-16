@@ -76,7 +76,7 @@ def color_from_name(s):
         return _library.color_from_name8(s)
 
 
-def open():
+def open_():
     if _library.terminal_open() == 0:
         return False
     _library.terminal_set8('terminal: encoding=ascii,'
@@ -86,7 +86,7 @@ def open():
 close = _library.terminal_close
 
 
-def set(s):
+def set_(s):
     if _version3 or isinstance(s, unicode):
         _wset(s)
     else:
@@ -147,12 +147,12 @@ def pick(x, y, z=0):
 
 
 def pick_color(x, y, z=0):
-    return _library.terminal_pick_color(x, y, z)
+    return _library.pick_color(x, y, z)
 
-terminal_pick_bkcolor = _library.terminal_pick_bkcolor
+pick_bkcolor = _library.terminal_pick_bkcolor
 
 
-def print(x, y, s):
+def print_(x, y, s):
     if _version3 or isinstance(s, unicode):
         return _wprint(x, y, s)
     else:
