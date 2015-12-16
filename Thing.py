@@ -331,6 +331,47 @@ class Map(Sequence):
         Unchanged is the construction of a polygon for the boundary and
         filling it in using point-in-polygon.
         """
+        """
+        Below is the previous version of the code. I have it in git, but I
+        want it available if I decide to reuse it for some reason.
+
+        corners = []
+        wall_points = []
+        for room in self.rooms:
+            wall_points.extend(room.wall_points)
+            for corner in room.corners:
+                if corner not in corners:
+                    corners.append(corner)
+
+        lines = []
+        for corner in corners:
+            lines.append(self.line(actor.x, actor.y
+                                   corner[0], corner[1], True))
+            # if more x than y, it's to the left and right
+            # add one above and below
+            if abs(corner[0] - actor.x) > abs(corner[1] - actor.y):
+                lines.append(self.line(actor.x, actor.y,
+                                       corner[0], corner[1] - 1))
+                lines.append(self.line(actor.x, actor.y,
+                                       corner[0], corner[1] + 1))
+            # otherwise, it's more y than x, so add one left and right
+            else:
+                lines.append(self.line(actor.x, actor.y
+                                       corner[0] - 1, corner[1]))
+                lines.append(self.line(actor.x, actor.y
+                                       corner[0] + 1, corner[1]))
+        # check orthogonal directions
+        lines.append(self.line(actor.x, actor.y, actor.x - 1, actor.y))
+        lines.append(self.line(actor.x, actor.y, actor.x + 1, actor.y))
+        lines.append(self.line(actor.x, actor.y, actor.x, actor.y - 1))
+        lines.append(self.line(actor.x, actor.y, actor.x, actor.y + 1))
+        # check diagonal directions
+        lines.append(self.line(actor.x, actor.y, actor.x - 1, actor.y - 1))
+        lines.append(self.line(actor.x, actor.y, actor.x + 1, actor.y - 1))
+        lines.append(self.line(actor.x, actor.y, actor.x - 1, actor.y + 1))
+        lines.append(self.line(actor.x, actor.y, actor.x + 1, actor.y + 1))
+        """
+
         wall_points = []
         for room in self.rooms:
             wall_points.extend(room.wall_points)
