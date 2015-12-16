@@ -71,23 +71,25 @@ def render_viewport(world, pc, offset):
         if offset_x <= col < offset_x + SCREEN_WIDTH:
             for row, tile in enumerate(column):
                 if offset_y <= row < offset_y + SCREEN_HEIGHT:
-                    tile.build_char(world.fov_map, pc.fov_toggle)
-                    if tile.occupied:
-                        blt.print(tile.x - offset_x,
-                                  tile.y - offset_y,
-                                  tile.occupied.char)
-                    elif tile.item:
-                        blt.print(tile.x - offset_x,
-                                  tile.y - offset_y,
-                                  tile.item.char)
-                    elif tile.prop:
-                        blt.print(tile.x - offset_x,
-                                  tile.y - offset_y,
-                                  tile.prop.char)
-                    else:
-                        blt.print(tile.x - offset_x,
-                                  tile.y - offset_y,
-                                  tile.char)
+                    if (tile.x, tile.y) in pc.viewed_map:
+                        tile.build_char(world.fov_map,
+                                        pc.fov_toggle)
+                        if tile.occupied:
+                            blt.print(tile.x - offset_x,
+                                      tile.y - offset_y,
+                                      tile.occupied.char)
+                        elif tile.item:
+                            blt.print(tile.x - offset_x,
+                                      tile.y - offset_y,
+                                      tile.item.char)
+                        elif tile.prop:
+                            blt.print(tile.x - offset_x,
+                                      tile.y - offset_y,
+                                      tile.prop.char)
+                        else:
+                            blt.print(tile.x - offset_x,
+                                      tile.y - offset_y,
+                                      tile.char)
 
 
 @layer_wrap
@@ -212,7 +214,7 @@ def process_input(key, world, pc):
 def main():
     initialize()
 
-    level = 'town'
+    level = 'debug'
     world = generate_world(level)
     race = 'human'
     pc = generate_player(world, race)

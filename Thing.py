@@ -18,17 +18,31 @@ class LOS_Shape(IntEnum):
     SQUARE = 1
 
 
+COLOR = {
+    'blue': '#89CCEE',
+    'purple': '#332288',
+    'turqoise': '#44AA99',
+    'green': '#117733',
+    'brown': '#999933',
+    'yellow': '#DDCC77',
+    'orange': '#CC6677',
+    'red': '#882255',
+    'pink': '#AA4499',
+    'white': '#EEEEEE',
+    'black': '#000000',
+    'grey': '#191919',
+    }
+
+
 class Thing:
     def __init__(self, x, y, glyph, color, physical, visible=True):
         self.x = x
         self.y = y
         self.glyph = glyph
-        if len(color.split()) > 1:
-            self.color_modifier, self.color = color.split()
-            self.color_modifier += ' '
+        if type(color) is 'str':
+            self.color = COLOR[color]
         else:
             self.color = color
-            self.color_modifier = ""
         self.physical = physical
         self.visible = visible
 
@@ -40,10 +54,10 @@ class Thing:
 
     def build_char(self, within_fov):
         if within_fov:
-            color = "".join((self.color_modifier, self.color))
+            bkcolor = ""
         else:
-            color = "darker " + self.color
-        elements = ["[color={}]".format(color), self.glyph]
+            bkcolor = "[bkcolor={}]".format(COLOR['grey'])
+        elements = [bkcolor, "[color={}]".format(self.color), self.glyph]
         self.char = "".join(e for e in elements)
 
 
@@ -69,6 +83,7 @@ class Actor(Thing):
         self.radius = self.base_radius
         self.los_shape = LOS_Shape.SQUARE
         self.fov_toggle = True
+        self.viewed_map = set()
         self.apparel = set()
         # Finalization Methods
         world.register(self)
@@ -162,7 +177,7 @@ class Tile(Thing):
     def build_door(self):
         self.update(glyph='.', physical=False)
         self.prop = Prop(x=self.x, y=self.y, glyph='+',
-                         color='white', physical=True)
+                         color=COLOR['white'], physical=True)
         self.prop.update(is_door=True, door_status=True)
 
     def check_door(self):
@@ -174,7 +189,7 @@ class Tile(Thing):
         self.prop.glyph = ["-", "+"][self.prop.door_status]
         self.prop.physical = not self.prop.physical
 
-    def build_char(self, fov_map, fov_toggle):
+    def build_char(self, fov_map, fov_toggle=True):
         # Only for debugging purposes. In production, this won't be accessible.
         if fov_toggle:
             if (self.x, self.y) in fov_map:
@@ -183,6 +198,7 @@ class Tile(Thing):
                 within_fov = False
         else:
             within_fov = True
+
         if self.occupied:
             self.occupied.build_char(within_fov)
         elif self.item:
@@ -192,12 +208,11 @@ class Tile(Thing):
         else:
             super().build_char(within_fov)
             if within_fov:
-                color = "".join((self.color_modifier, self.color))
+                bkcolor = "[bkcolor={}]".format(self.bkcolor)
             else:
-                color = "darker " + self.color
-            color = "[color={}]".format(color)
-            bkcolor = "[bkcolor={}]".format(self.bkcolor)
-            elements = [color, bkcolor, self.glyph]
+                bkcolor = "[bkcolor={}]".format(COLOR['grey'])
+            color = "[color={}]".format(self.color)
+            elements = [bkcolor, color, self.glyph]
             self.char = "".join(e for e in elements)
 
 
@@ -398,6 +413,7 @@ class Map(Sequence):
                     fov.append((x, y))
                 elif self.point_in_poly(x, y, vertx, verty):
                     fov.append((x, y))
+        actor.viewed_map.update(fov)
         self.fov_map = fov
 
     def point_in_poly(self, x, y, vertx, verty):
@@ -434,8 +450,8 @@ class Map(Sequence):
         self.start_loc = None
 
     def generate_ground(self):
-        self.layout = [[Tile(x=x, y=y, glyph='.', color='green',
-                       bkcolor='black', physical=False)
+        self.layout = [[Tile(x=x, y=y, glyph='.', color=COLOR['green'],
+                       bkcolor=COLOR['black'], physical=False)
                        for y in range(self.height)]
                        for x in range(self.width)]
         self.fov = [[False for y in range(self.height)]
