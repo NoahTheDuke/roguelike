@@ -9,7 +9,7 @@ debug:
     num_exits: 2
 town:
     name: 'town'
-    level: None
+    level: 0
     region: start
     width: 70
     height: 70

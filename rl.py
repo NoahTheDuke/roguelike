@@ -1,5 +1,5 @@
 import yaml
-from PyBearLibTerminal import *
+import PyBearLibTerminal as blt
 from Thing import Actor, Map, Game_States
 from time import perf_counter
 import random
@@ -15,20 +15,23 @@ CELLSIZE = "12x12"
 # Game state constants
 game_states = Game_States
 
+
 def layer_wrap(func):
     def func_wrapper(*args, **kwargs):
-        cur_layer = terminal_state(TK_LAYER)
+        cur_layer = blt.state(blt.TK_LAYER)
         func(*args, **kwargs)
-        terminal_layer(cur_layer)
+        blt.layer(cur_layer)
     return func_wrapper
 
+
 def render(world, pc, offset):
-    terminal_clear()
+    blt.clear()
     world.calculate_fov(pc)
     render_viewport(world, pc, offset)
     render_UI(world, pc)
     render_message_bar()
-    terminal_refresh()
+    blt.refresh()
+
 
 def find_offset(world, pc, offset):
     """
@@ -58,10 +61,11 @@ def find_offset(world, pc, offset):
         offset_y = pc.y - center_y
     return (offset_x, offset_y)
 
+
 @layer_wrap
 def render_viewport(world, pc, offset):
     global SCREEN_WIDTH, SCREEN_HEIGHT
-    terminal_layer(0)
+    blt.layer(0)
     offset_x, offset_y = offset
     for col, column in enumerate(world):
         if offset_x <= col < offset_x + SCREEN_WIDTH:
@@ -69,41 +73,48 @@ def render_viewport(world, pc, offset):
                 if offset_y <= row < offset_y + SCREEN_HEIGHT:
                     tile.build_char(world.fov_map, pc.fov_toggle)
                     if tile.occupied:
-                        terminal_print(tile.x - offset_x,
-                                       tile.y - offset_y,
-                                       tile.occupied.char)
+                        blt.print(tile.x - offset_x,
+                                  tile.y - offset_y,
+                                  tile.occupied.char)
                     elif tile.item:
-                        terminal_print(tile.x - offset_x,
-                                       tile.y - offset_y,
-                                       tile.item.char)
+                        blt.print(tile.x - offset_x,
+                                  tile.y - offset_y,
+                                  tile.item.char)
                     elif tile.prop:
-                        terminal_print(tile.x - offset_x,
-                                       tile.y - offset_y,
-                                       tile.prop.char)
+                        blt.print(tile.x - offset_x,
+                                  tile.y - offset_y,
+                                  tile.prop.char)
                     else:
-                        terminal_print(tile.x - offset_x,
-                                       tile.y - offset_y,
-                                       tile.char)
+                        blt.print(tile.x - offset_x,
+                                  tile.y - offset_y,
+                                  tile.char)
+
 
 @layer_wrap
 def render_UI(world, pc):
     global SCREEN_WIDTH, SCREEN_HEIGHT
     spacing = 0
     loc = SCREEN_WIDTH + 1
-    terminal_layer(10)
-    terminal_print(loc, 1 + spacing, "Name:   [color={}]{}".format(pc.color, pc.name))
-    terminal_print(loc, 2 + spacing, "Health: [color=red]{}".format(pc.cur_health))
-    terminal_print(loc, 3 + spacing, "Mana:   [color=lighter blue]{}".format(pc.cur_mana))
-    terminal_print(loc, 4 + spacing, "X:      {}".format(pc.x))
-    terminal_print(loc, 5 + spacing, "Y:      {}".format(pc.y))
+    blt.layer(10)
+    blt.print(loc, 1 + spacing, "Name:   [color={}]{}".format(
+        pc.color, pc.name))
+    blt.print(loc, 2 + spacing, "Health: [color=red]{}".format(
+        pc.cur_health))
+    blt.print(loc, 3 + spacing, "Mana:   [color=lighter blue]{}".format(
+        pc.cur_mana))
+    blt.print(loc, 4 + spacing, "X:      {}".format(pc.x))
+    blt.print(loc, 5 + spacing, "Y:      {}".format(pc.y))
+
 
 @layer_wrap
 def render_message_bar():
     global SCREEN_WIDTH, SCREEN_HEIGHT
-    terminal_layer(15)
-    terminal_print(2, SCREEN_HEIGHT, "Messages: ")
+    blt.layer(15)
+    blt.print(2, SCREEN_HEIGHT, "Messages: ")
 
 square = False
+
+
 def move_actor(world, pc, to):
     global WINDOW_WIDTH, WINDOW_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, square
     fx, fy = pc.x, pc.y
@@ -112,12 +123,14 @@ def move_actor(world, pc, to):
     if world.width > dx >= 0 and world.height > dy >= 0:
         pc.move(world, tx, ty)
 
+
 def try_door(world, pc):
     adjacent = pc.adjacent(world)
     for (x, y) in adjacent:
         if world[x][y].check_door():
             world[x][y].toggle_door()
             pc.move(world, 0, 0)
+
 
 def generate_world(name):
     w = []
@@ -131,59 +144,66 @@ def generate_world(name):
                min_rooms=w['min_rooms'], max_rooms=w['max_rooms'],
                num_exits=w['num_exits'], level=w['level'], region=w['region'])
 
+
 def generate_player(world, race):
     with open("data/player.yaml", 'r') as player_yaml:
         pc = yaml.load(player_yaml)
     x, y = world.start_loc
     pc = pc[race]
-    return Actor(world, pc['name'], x, y, pc['char'], pc['color'], pc['physical'],
-                 pc['max_health'], pc['max_mana'], pc['attack'], pc['defense'])
+    return Actor(world, pc['name'], x, y, pc['char'], pc['color'],
+                 pc['physical'], pc['max_health'], pc['max_mana'],
+                 pc['attack'], pc['defense'])
+
 
 def generate_monsters(world):
     with open('data/monsters.yaml', 'r') as monsters_yaml:
         monsters = yaml.load(monsters_yaml)
     print(monsters)
 
+
 def initialize():
     global WINDOW_WIDTH, WINDOW_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, CELLSIZE
-    terminal_open()
-    terminal_set("window: size={}x{}, cellsize={}, title='Roguelike';"
-                 "font: default".format(str(WINDOW_WIDTH), str(WINDOW_HEIGHT), CELLSIZE))
-    terminal_clear()
-    terminal_refresh()
-    terminal_color("white")
+    blt.open()
+    blt.set("window: size={}x{}, cellsize={}, title='Roguelike';"
+            "font: default".format(
+                str(WINDOW_WIDTH), str(WINDOW_HEIGHT), CELLSIZE))
+    blt.clear()
+    blt.refresh()
+    blt.color("white")
     random.seed(2)
+
 
 def update(world, pc, offset, time_elapsed, time_current):
     offset = find_offset(world, pc, offset)
     return world, pc, offset
 
+
 def process_input(key, world, pc):
-    if key == TK_K | TK_KEY_RELEASED:
+    if key == blt.TK_K | blt.TK_KEY_RELEASED:
         move_actor(world, pc, (0, -1))
-    elif key == TK_J | TK_KEY_RELEASED:
+    elif key == blt.TK_J | blt.TK_KEY_RELEASED:
         move_actor(world, pc, (0, 1))
-    elif key == TK_H | TK_KEY_RELEASED:
+    elif key == blt.TK_H | blt.TK_KEY_RELEASED:
         move_actor(world, pc, (-1, 0))
-    elif key == TK_L | TK_KEY_RELEASED:
+    elif key == blt.TK_L | blt.TK_KEY_RELEASED:
         move_actor(world, pc, (1, 0))
-    elif key == TK_Y | TK_KEY_RELEASED:
+    elif key == blt.TK_Y | blt.TK_KEY_RELEASED:
         move_actor(world, pc, (-1, -1))
-    elif key == TK_U | TK_KEY_RELEASED:
+    elif key == blt.TK_U | blt.TK_KEY_RELEASED:
         move_actor(world, pc, (1, -1))
-    elif key == TK_B | TK_KEY_RELEASED:
+    elif key == blt.TK_B | blt.TK_KEY_RELEASED:
         move_actor(world, pc, (-1, 1))
-    elif key == TK_N | TK_KEY_RELEASED:
+    elif key == blt.TK_N | blt.TK_KEY_RELEASED:
         move_actor(world, pc, (1, 1))
-    elif key == TK_PERIOD | TK_KEY_RELEASED:
+    elif key == blt.TK_PERIOD | blt.TK_KEY_RELEASED:
         move_actor(world, pc, (0, 0))
-    elif key == TK_C | TK_KEY_RELEASED:
+    elif key == blt.TK_C | blt.TK_KEY_RELEASED:
         try_door(world, pc)
-    elif key == TK_F | TK_KEY_RELEASED:
+    elif key == blt.TK_F | blt.TK_KEY_RELEASED:
         pc.fov_toggle = not pc.fov_toggle
-    elif key == TK_S | TK_KEY_RELEASED:
+    elif key == blt.TK_S | blt.TK_KEY_RELEASED:
         pc.change_los()
-    elif key == TK_R | TK_KEY_RELEASED:
+    elif key == blt.TK_R | blt.TK_KEY_RELEASED:
         world.generate_map(world.width, world.height, world.num_exits)
         pc.place(world.start_loc)
         world.register(pc)
@@ -207,29 +227,31 @@ def main():
 
     while proceed:
         current_time = perf_counter()
-        if (current_time - previous_time) > (UPDATE_INTERVAL_MS * UPDATE_PER_FRAME_LIMIT):
+        if (current_time - previous_time) > (
+                UPDATE_INTERVAL_MS * UPDATE_PER_FRAME_LIMIT):
             clock += UPDATE_INTERVAL_MS * UPDATE_PER_FRAME_LIMIT
         else:
             clock += current_time - previous_time
         while clock >= next_update:
             time_elapsed = UPDATE_INTERVAL_MS
             time_current = next_update
-            world, pc, offset = update(world, pc, offset, time_elapsed, time_current)
+            world, pc, offset = update(world, pc, offset,
+                                       time_elapsed, time_current)
             next_update += UPDATE_INTERVAL_MS
         previous_time = perf_counter()
 
         render(world, pc, offset)
 
         key = 0
-        while terminal_has_input():
-            key = terminal_read()
-            if key == TK_CLOSE or key == TK_Q:
+        while blt.has_input():
+            key = blt.read()
+            if key == blt.TK_CLOSE or key == blt.TK_Q:
                 proceed = False
             else:
                 process_input(key, world, pc)
 
     # if proceed is False, end the program
-    terminal_close()
+    blt.close()
 
 if __name__ == '__main__':
     main()

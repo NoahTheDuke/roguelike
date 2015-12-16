@@ -4,6 +4,7 @@ from enum import IntEnum
 from random import randint, randrange
 from math import atan2, sqrt, pi
 
+
 class Game_States(IntEnum):
     MAIN_MENU = 0
     NEW_GAME = 1
@@ -11,9 +12,11 @@ class Game_States(IntEnum):
     OPTIONS = 3
     HISTORY = 4
 
+
 class LOS_Shape(IntEnum):
     EUCLID = 0
     SQUARE = 1
+
 
 class Thing:
     def __init__(self, x, y, glyph, color, physical, visible=True):
@@ -42,6 +45,7 @@ class Thing:
             color = "darker " + self.color
         elements = ["[color={}]".format(color), self.glyph]
         self.char = "".join(e for e in elements)
+
 
 class Actor(Thing):
     def __init__(self, world, name, x, y, glyph, color, physical,
@@ -104,11 +108,13 @@ class Actor(Thing):
                     adjacent.append((x, y))
         return adjacent
 
+
 class Item(Thing):
     def __init__(self, name, x, y, glyph, color, physical):
         Thing.__init__(self, x, y, glyph, color, physical)
         self.name = name
         self.uuid = uuid4()
+
 
 class Prop(Thing):
     def __init__(self, x, y, glyph, color, physical):
@@ -120,6 +126,7 @@ class Prop(Thing):
     def update(self, **kwargs):
         for key, value in kwargs.items():
             setattr(self, key, value)
+
 
 class Tile(Thing):
     def __init__(self, x, y, glyph, color, bkcolor, physical):
@@ -144,7 +151,9 @@ class Tile(Thing):
         "occupied: {}, "
         "prop: {}, "
         "item: {}, "
-        "uuid: {}".format(self.x, self.y, self.glyph, self.char, self.color, self.physical, self.occupied, self.prop, self.item, self.uuid)
+        "uuid: {}".format(self.x, self.y, self.glyph, self.char, self.color,
+                          self.physical, self.occupied, self.prop, self.item,
+                          self.uuid)
 
     def update(self, **kwargs):
         for key, value in kwargs.items():
@@ -152,7 +161,8 @@ class Tile(Thing):
 
     def build_door(self):
         self.update(glyph='.', physical=False)
-        self.prop = Prop(x=self.x, y=self.y, glyph='+', color='white', physical=True)
+        self.prop = Prop(x=self.x, y=self.y, glyph='+',
+                         color='white', physical=True)
         self.prop.update(is_door=True, door_status=True)
 
     def check_door(self):
@@ -189,6 +199,7 @@ class Tile(Thing):
             bkcolor = "[bkcolor={}]".format(self.bkcolor)
             elements = [color, bkcolor, self.glyph]
             self.char = "".join(e for e in elements)
+
 
 class Map(Sequence):
     def __init__(self, name, width, height,
@@ -330,9 +341,11 @@ class Map(Sequence):
                 # Also, these math bits are weird. I don't know that I need
                 # them.
                 if actor.los_shape == LOS_Shape.EUCLID:
-                    distance = sqrt((step[0] - actor.x) ** 2 + (step[1] - actor.y) ** 2)
+                    distance = sqrt((step[0] - actor.x) ** 2
+                                    + (step[1] - actor.y) ** 2)
                 else:
-                    distance = max(abs(step[0] - actor.x), abs(step[1] - actor.y))
+                    distance = max(abs(step[0] - actor.x),
+                                   abs(step[1] - actor.y))
                 if distance < actor.radius:
                     if step in wall_points:
                         if not self[step[0]][step[1]].check_door():
@@ -351,7 +364,9 @@ class Map(Sequence):
 
         def algo(point):
             nonlocal actor
-            return (atan2(point[1] - actor.y, point[0] - actor.x) + 2 * pi) % (2 * pi)
+            return (atan2(point[1] - actor.y,
+                          point[0] - actor.x)
+                    + 2 * pi) % (2 * pi)
 
         polygon.sort(key=algo)
         poly_walls = []
@@ -397,7 +412,10 @@ class Map(Sequence):
         j = len(vertx) - 1
         for i in range(len(vertx)):
             if ((verty[i] > y) != (verty[j] > y)):
-                if (x < (vertx[j] - vertx[i]) * (y - verty[i]) / (verty[j] - verty[i]) + vertx[i]):
+                if (x < (vertx[j] - vertx[i])
+                        * (y - verty[i])
+                        / (verty[j] - verty[i])
+                        + vertx[i]):
                     c = not c
             j = i
         return c
@@ -417,14 +435,15 @@ class Map(Sequence):
 
     def generate_ground(self):
         self.layout = [[Tile(x=x, y=y, glyph='.', color='green',
-                        bkcolor='black', physical=False)
-                            for y in range(self.height)]
-                                for x in range(self.width)]
-        self.fov = [[False for y in range(self.height)] for x in range(self.width)]
+                       bkcolor='black', physical=False)
+                       for y in range(self.height)]
+                       for x in range(self.width)]
+        self.fov = [[False for y in range(self.height)]
+                    for x in range(self.width)]
 
     def carve_rooms(self):
-        cur_max = self.max_rooms + 5
-        # cur_max = randint(self.min_rooms, self.max_rooms)
+        # cur_max = self.max_rooms + 5
+        cur_max = randint(self.min_rooms, self.max_rooms)
         while len(self.rooms) < cur_max:
             w, h = randint(2, 10), randint(2, 10)
             x, y = randint(0, self.width - w), randint(0, self.height - h)
@@ -434,7 +453,8 @@ class Map(Sequence):
                 if new_room.intersect(other_room):
                     failed = True
                     break
-            if (new_room.x_right >= self.width) or (new_room.y_bottom >= self.height):
+            if (new_room.x_right >= self.width) or (new_room.y_bottom >=
+                                                    self.height):
                 failed = True
             if not failed:
                 self.rooms.append(new_room)
@@ -446,7 +466,9 @@ class Map(Sequence):
                            (x == new_room.x_right) or
                            (y == new_room.y_top) or
                            (y == new_room.y_bottom)):
-                            self[x][y].update(glyph='#', color='grey', physical=True)
+                            self[x][y].update(glyph='#',
+                                              color='grey',
+                                              physical=True)
                         else:
                             self[x][y].update(glyph='.', color='amber')
         new_room = RectRoom(0, 0, self.width - 1, self.height - 1)
@@ -466,14 +488,19 @@ class Map(Sequence):
         for room in self.rooms:
             side = randint(0, 3)
             if side is 0:
-                x, y = (randrange(room.x_left + 1, room.x_right), room.y_top)
+                x, y = (randrange(room.x_left + 1, room.x_right),
+                        room.y_top)
             elif side is 1:
-                x, y = (room.x_left, randrange(room.y_top + 1, room.y_bottom))
+                x, y = (room.x_left,
+                        randrange(room.y_top + 1, room.y_bottom))
             elif side is 2:
-                x, y = (randrange(room.x_left + 1, room.x_right), room.y_bottom)
+                x, y = (randrange(room.x_left + 1, room.x_right),
+                        room.y_bottom)
             elif side is 3:
-                x, y = (room.x_right, randrange(room.y_top + 1, room.y_bottom))
+                x, y = (room.x_right,
+                        randrange(room.y_top + 1, room.y_bottom))
             self[x][y].build_door()
+
 
 class RectRoom:
     def __init__(self, x, y, w, h):
@@ -491,13 +518,28 @@ class RectRoom:
         bottom_left = (self.x_left, self.y_bottom)
         self.corners = (top_left, top_right, bottom_right, bottom_left)
         self.corner_points = []
-        self.corner_points.extend((top_left, top_right, bottom_right, bottom_left))
+        self.corner_points.extend((top_left,
+                                  top_right,
+                                  bottom_right,
+                                  bottom_left))
 
     def walls(self):
-        top = self.line(self.x_left, self.y_top, self.x_right, self.y_top)
-        right = self.line(self.x_right, self.y_top, self.x_right, self.y_bottom)
-        bottom = self.line(self.x_left, self.y_bottom, self.x_right, self.y_bottom)
-        left = self.line(self.x_left, self.y_top, self.x_left, self.y_bottom)
+        top = self.line(self.x_left,
+                        self.y_top,
+                        self.x_right,
+                        self.y_top)
+        right = self.line(self.x_right,
+                          self.y_top,
+                          self.x_right,
+                          self.y_bottom)
+        bottom = self.line(self.x_left,
+                           self.y_bottom,
+                           self.x_right,
+                           self.y_bottom)
+        left = self.line(self.x_left,
+                         self.y_top,
+                         self.x_left,
+                         self.y_bottom)
         self.walls = (top, right, bottom, left)
         self.wall_points = []
         for wall in self.walls:
@@ -538,8 +580,11 @@ class RectRoom:
         return (x, y)
 
     def intersect(self, other):
-        return (self.x_left <= other.x_right and self.x_right >= other.x_left and
-                self.y_top <= other.y_bottom and self.y_bottom >= other.y_top)
+        return (self.x_left <= other.x_right
+                and self.x_right >= other.x_left
+                and self.y_top <= other.y_bottom
+                and self.y_bottom >= other.y_top)
+
 
 class RightAnglePassage:
     def __init__(self, start_loc, end_loc, width):
