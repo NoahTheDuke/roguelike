@@ -499,7 +499,6 @@ class Map(Sequence):
                     for x in range(self.width)]
 
     def carve_rooms(self):
-        # cur_max = self.max_rooms + 5
         cur_max = randint(self.min_rooms, self.max_rooms)
         while len(self.rooms) < cur_max:
             w, h = randint(2, 10), randint(2, 10)

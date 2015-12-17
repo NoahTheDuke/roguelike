@@ -164,18 +164,6 @@ def generate_monsters(world):
     print(monsters)
 
 
-def initialize():
-    global WINDOW_WIDTH, WINDOW_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, CELLSIZE
-    blt.open_()
-    blt.set_("window: size={}x{}, cellsize={}, title='Roguelike';"
-             "font: default".format(
-                 str(WINDOW_WIDTH), str(WINDOW_HEIGHT), CELLSIZE))
-    blt.clear()
-    blt.refresh()
-    blt.color("white")
-    random.seed(2)
-
-
 def update(world, pc, offset, time_elapsed, time_current):
     offset = find_offset(world, pc, offset)
     return world, pc, offset
@@ -210,6 +198,18 @@ def process_input(key, world, pc):
         world.generate_map(world.width, world.height, world.num_exits)
         pc.place(world.start_loc)
         world.register(pc)
+
+
+def initialize():
+    global WINDOW_WIDTH, WINDOW_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, CELLSIZE
+    blt.open_()
+    blt.set_("window: size={}x{}, cellsize={}, title='Roguelike';"
+             "font: default".format(
+                 str(WINDOW_WIDTH), str(WINDOW_HEIGHT), CELLSIZE))
+    blt.clear()
+    blt.refresh()
+    blt.color("white")
+    random.seed(2)
 
 
 def main():
