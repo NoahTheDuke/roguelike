@@ -15,6 +15,77 @@ class Quadrant:
     size = 325
     small_size = 25
     street_width = 5
+    net_0 = [1, 1, 1, 1, 1,
+             1, 0, 1, 1, 0,
+             0, 0, 0, 1, 1,
+             1, 1, 0, 0, 0,
+             0, 1, 1, 0, 1,
+             1, 1, 1, 1, 1,
+             1, 0, 1, 0, 1, 1,
+             1, 1, 1, 0, 0, 1,
+             1, 1, 0, 0, 1, 1,
+             1, 0, 0, 1, 1, 1,
+             1, 1, 0, 1, 0, 1]
+
+    net_1 = [1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1]
+
+    net_2 = [1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1]
+
+    net_3 = [1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1]
+
+    net_4 = [1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1]
+
+    net_5 = [1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1,
+             1, 1, 1, 1, 1, 1]
 
     def __init__(self):
         self.layout = [[Tile(x, y)
@@ -31,18 +102,14 @@ class Quadrant:
 
         dirs = [[1, 0], [0, 1], [-1, 0], [0, -1]]
         result = []
-        for node in self.all_nodes:
-            for dr in dirs:
+        for dr in dirs:
+            for node in self.all_nodes:
                 neighbor = [node[0] + dr[0], node[1] + dr[1]]
                 if 0 <= neighbor[0] < 11 and 0 <= neighbor[1] < 11:
                     if neighbor not in result:
                         result.append(neighbor)
         print(result)
-        for (x, y) in result:
-            d, m = divmod(x, 5)
-            if m > 0 and m != 4:
-                print(m)
-        self.roads = result
+        self.roads = [x for idx, x in enumerate(result) if self.net_0[idx] is 1]
 
     def make_blocks(self):
         self.blocks = [[x, y]
@@ -71,13 +138,14 @@ def main():
     for x in range(30):
         for y in range(30):
             if [x, y] in g.all_nodes:
-                blt.print_(x * 2, y * 2, ' ')
+                blt.print_(x * 2, y * 2, 'O')
             elif [x, y] in g.roads:
-                xd, xm = divmod(x, 5)
-                yd, ym = divmod(y, 5)
-                print(xd, xm)
-                print(yd, ym)
-                blt.print_(x * 2, y * 2, str(g.roads.index([x, y])))
+                # if x != 0 and x != 10 and y != 0 and y != 10:
+                    # blt.layer(1)
+                # blt.print_(x * 2, y * 2, str(g.roads.index([x, y])))
+                    # blt.layer(0)
+                # else:
+                blt.print_(x * 2, y * 2, '+')
     blt.refresh()
 
     proceed = True
