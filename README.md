@@ -9,14 +9,18 @@ Suburban wasteland, possibly post-apocalypse. Takes place in a massive [Fused Gr
 
 To keep the scope small while I figure out the code, let's make it one quadrant to start. 40 - 60 houses, small road connections, 2 - 3 parks, and nothing else. If that works, I'll build it up, but not one second before.
 
-House generation:
+## Square size:
+4 feet squares. That's a lot of room, but it's the best I can think of. 5 is far too big, but 3 makes memory requirements harsher. Oh well! I'll survive.
+
+## House generation:
 
 * One story: Living room, kitchen, bedroom, bathroom. Garage, if I'm feeling crazy!
 * Template base size, marked "dark" with 0s. Carve out the living room, pick a wall and carve out the next room, incrementing the "room counter".
 * Props? Chairs, desks, bookcases, beds, clothing? Close enough.
 * Don't place it in the main world immediately. Find the bounds and only render those. No seeing in, no seeing out. KISS
 
-Street sizes:
+
+## Street sizes:
 
 * Local streets are 5 squares wide (20 feet).
 * Minor connectors are 10 squares wide (40 feet).

@@ -516,32 +516,21 @@ class Map(Sequence):
                 self.rooms.append(new_room)
                 if not self.start_loc:
                     self.start_loc = new_room.center()
-                for x in range(new_room.x_left, new_room.x_right + 1):
-                    for y in range(new_room.y_top, new_room.y_bottom + 1):
-                        if ((x == new_room.x_left) or
-                           (x == new_room.x_right) or
-                           (y == new_room.y_top) or
-                           (y == new_room.y_bottom)):
-                            self[x][y].update(glyph='#',
-                                              color='grey',
-                                              physical=True)
-                        else:
-                            self[x][y].update(glyph='.', color='amber')
-        new_room = RectRoom(0, 0, self.width - 1, self.height - 1)
-        for x in range(new_room.x_left, new_room.x_right + 1):
-            for y in range(new_room.y_top, new_room.y_bottom + 1):
-                if ((x == new_room.x_left) or
-                   (x == new_room.x_right) or
-                   (y == new_room.y_top) or
-                   (y == new_room.y_bottom)):
+                for x, y in new_room.wall_points:
                     self[x][y].update(glyph='#', color='grey', physical=True)
+                for y in range(new_room.y_top + 1, new_room.y_bottom):
+                    for x in range(new_room.x_left + 1, new_room.x_right):
+                        self[x][y].update(glyph='.', color='amber')
+        new_room = RectRoom(0, 0, self.width - 1, self.height - 1)
+        for x, y in new_room.wall_points:
+            self[x][y].update(glyph='#', color='grey', physical=True)
         self.rooms.append(new_room)
 
     def carve_passages(self):
         pass
 
     def build_features(self):
-        for room in self.rooms:
+        for idx, room in enumerate(self.rooms):
             side = randint(0, 3)
             if side is 0:
                 x, y = (randrange(room.x_left + 1, room.x_right),
@@ -555,7 +544,8 @@ class Map(Sequence):
             elif side is 3:
                 x, y = (room.x_right,
                         randrange(room.y_top + 1, room.y_bottom))
-            self[x][y].build_door()
+            if idx < len(self.rooms) - 1:
+                self[x][y].build_door()
 
 
 class RectRoom:

@@ -25,7 +25,7 @@ class Quadrant:
              1, 1, 1, 1, 1, 1,
              1, 1, 1, 1, 1,
              1, 1, 1, 1, 1, 1,
-             1, 1, 1, 1, 1,]
+             1, 1, 1, 1, 1, ]
 
     net_1 = [1, 1, 1, 1, 1,
              1, 1, 1, 1, 1, 1,
@@ -37,7 +37,7 @@ class Quadrant:
              1, 1, 1, 1, 1, 1,
              1, 1, 1, 1, 1,
              1, 1, 1, 1, 1, 1,
-             1, 1, 1, 1, 1,]
+             1, 1, 1, 1, 1, ]
 
     net_2 = [1, 1, 1, 1, 1,
              1, 1, 1, 1, 1, 1,
@@ -49,7 +49,7 @@ class Quadrant:
              1, 1, 1, 1, 1, 1,
              1, 1, 1, 1, 1,
              1, 1, 1, 1, 1, 1,
-             1, 1, 1, 1, 1,]
+             1, 1, 1, 1, 1, ]
 
     net_3 = [1, 1, 1, 1, 1,
              1, 1, 1, 1, 1, 1,
@@ -61,7 +61,7 @@ class Quadrant:
              1, 1, 1, 1, 1, 1,
              1, 1, 1, 1, 1,
              1, 1, 1, 1, 1, 1,
-             1, 1, 1, 1, 1,]
+             1, 1, 1, 1, 1, ]
 
     net_4 = [1, 1, 1, 1, 1,
              1, 1, 1, 1, 1, 1,
@@ -73,7 +73,7 @@ class Quadrant:
              1, 1, 1, 1, 1, 1,
              1, 1, 1, 1, 1,
              1, 1, 1, 1, 1, 1,
-             1, 1, 1, 1, 1,]
+             1, 1, 1, 1, 1, ]
 
     net_5 = [1, 1, 1, 1, 1,
              1, 1, 1, 1, 1, 1,
@@ -85,7 +85,7 @@ class Quadrant:
              1, 1, 1, 1, 1, 1,
              1, 1, 1, 1, 1,
              1, 1, 1, 1, 1, 1,
-             1, 1, 1, 1, 1,]
+             1, 1, 1, 1, 1, ]
 
     def __init__(self):
         self.layout = [[Tile(x, y)
@@ -112,9 +112,10 @@ class Quadrant:
                 if 0 <= down[0] < 11 and 0 <= down[1] < 11:
                     below.append(down)
         print(result, below)
-        
+
         # result = [val for pair in zip(result, below) for val in pair]
-        self.roads = [x for idx, x in enumerate(result) if self.net_0[idx] is 1]
+        self.roads = [x for idx, x in enumerate(result)
+                      if self.net_0[idx] is 1]
         print(result)
 
     def make_blocks(self):
