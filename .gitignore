@@ -56,5 +56,8 @@ docs/_build/
 # PyBuilder
 target/
 
-#vim shit
+# Vim shit
 *~
+
+# Other stuff
+Programming/
