@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from enum import IntEnum
 from random import randint, randrange
 from math import atan2, sqrt, pi
+import sys
 
 
 class Game_States(IntEnum):
@@ -94,7 +95,7 @@ class Actor(Thing):
         else:
             self.los_shape = LOS_Shape(0)
         if self.los_shape == LOS_Shape.EUCLID:
-            self.radius = sqrt(((self.base_radius * 2) ** 2) / pi)
+            self.radius = int(sqrt(((self.base_radius * 2) ** 2) / pi))
         else:
             self.radius = self.base_radius
 

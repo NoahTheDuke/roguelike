@@ -1,5 +1,5 @@
 import yaml
-import PyBearLibTerminal as blt
+from bearlibterminal import terminal
 from Thing import Actor, Map, Game_States, COLOR
 from time import perf_counter
 import random
@@ -18,20 +18,20 @@ game_states = Game_States
 
 def layer_wrap(func):
     def func_wrapper(*args, **kwargs):
-        cur_layer = blt.state(blt.TK_LAYER)
+        cur_layer = terminal.state(terminal.TK_LAYER)
         func(*args, **kwargs)
-        blt.layer(cur_layer)
+        terminal.layer(cur_layer)
     return func_wrapper
 
 
 def render(world, pc, offset):
-    blt.clear()
+    terminal.clear()
     if pc.fog_toggle:
         world.calculate_fov(pc)
     render_viewport(world, pc, offset)
     render_UI(world, pc)
     render_message_bar()
-    blt.refresh()
+    terminal.refresh()
 
 
 def find_offset(world, pc, offset):
@@ -66,7 +66,7 @@ def find_offset(world, pc, offset):
 @layer_wrap
 def render_viewport(world, pc, offset):
     global SCREEN_WIDTH, SCREEN_HEIGHT
-    blt.layer(0)
+    terminal.layer(0)
     offset_x, offset_y = offset
     for col, column in enumerate(world):
         if offset_x <= col < offset_x + SCREEN_WIDTH:
@@ -76,19 +76,19 @@ def render_viewport(world, pc, offset):
                         tile.build_char(world.fov_map,
                                         pc.fog_toggle)
                         if tile.occupied:
-                            blt.print_(tile.x - offset_x,
+                            terminal.print_(tile.x - offset_x,
                                        tile.y - offset_y,
                                        tile.occupied.char)
                         elif tile.item:
-                            blt.print_(tile.x - offset_x,
+                            terminal.print_(tile.x - offset_x,
                                        tile.y - offset_y,
                                        tile.item.char)
                         elif tile.prop:
-                            blt.print_(tile.x - offset_x,
+                            terminal.print_(tile.x - offset_x,
                                        tile.y - offset_y,
                                        tile.prop.char)
                         else:
-                            blt.print_(tile.x - offset_x,
+                            terminal.print_(tile.x - offset_x,
                                        tile.y - offset_y,
                                        tile.char)
 
@@ -98,22 +98,22 @@ def render_UI(world, pc):
     global SCREEN_WIDTH, SCREEN_HEIGHT
     spacing = 0
     loc = SCREEN_WIDTH + 1
-    blt.layer(10)
-    blt.print_(loc, 1 + spacing, "Name:   [color={}]{}".format(
+    terminal.layer(10)
+    terminal.print_(loc, 1 + spacing, "Name:   [color={}]{}".format(
         pc.color, pc.name))
-    blt.print_(loc, 2 + spacing, "Health: [color={}]{}".format(
+    terminal.print_(loc, 2 + spacing, "Health: [color={}]{}".format(
         COLOR['pink'], pc.cur_health))
-    blt.print_(loc, 3 + spacing, "Mana:   [color={}]{}".format(
+    terminal.print_(loc, 3 + spacing, "Mana:   [color={}]{}".format(
         COLOR['blue'], pc.cur_mana))
-    blt.print_(loc, 4 + spacing, "X:      {}".format(pc.x))
-    blt.print_(loc, 5 + spacing, "Y:      {}".format(pc.y))
+    terminal.print_(loc, 4 + spacing, "X:      {}".format(pc.x))
+    terminal.print_(loc, 5 + spacing, "Y:      {}".format(pc.y))
 
 
 @layer_wrap
 def render_message_bar():
     global SCREEN_WIDTH, SCREEN_HEIGHT
-    blt.layer(15)
-    blt.print_(2, SCREEN_HEIGHT, "Messages: ")
+    terminal.layer(15)
+    terminal.print_(2, SCREEN_HEIGHT, "Messages: ")
 
 square = False
 
@@ -170,46 +170,47 @@ def update(world, pc, offset, time_elapsed, time_current):
 
 
 def process_input(key, world, pc):
-    if key == blt.TK_K | blt.TK_KEY_RELEASED:
+    if key == terminal.TK_K:
         move_actor(world, pc, (0, -1))
-    elif key == blt.TK_J | blt.TK_KEY_RELEASED:
+    elif key == terminal.TK_J:
         move_actor(world, pc, (0, 1))
-    elif key == blt.TK_H | blt.TK_KEY_RELEASED:
+    elif key == terminal.TK_H:
         move_actor(world, pc, (-1, 0))
-    elif key == blt.TK_L | blt.TK_KEY_RELEASED:
+    elif key == terminal.TK_L:
         move_actor(world, pc, (1, 0))
-    elif key == blt.TK_Y | blt.TK_KEY_RELEASED:
+    elif key == terminal.TK_Y:
         move_actor(world, pc, (-1, -1))
-    elif key == blt.TK_U | blt.TK_KEY_RELEASED:
+    elif key == terminal.TK_U:
         move_actor(world, pc, (1, -1))
-    elif key == blt.TK_B | blt.TK_KEY_RELEASED:
+    elif key == terminal.TK_B:
         move_actor(world, pc, (-1, 1))
-    elif key == blt.TK_N | blt.TK_KEY_RELEASED:
+    elif key == terminal.TK_N:
         move_actor(world, pc, (1, 1))
-    elif key == blt.TK_PERIOD | blt.TK_KEY_RELEASED:
+    elif key == terminal.TK_PERIOD:
         move_actor(world, pc, (0, 0))
-    elif key == blt.TK_C | blt.TK_KEY_RELEASED:
+    elif key == terminal.TK_C:
         try_door(world, pc)
-    elif key == blt.TK_F | blt.TK_KEY_RELEASED:
+    elif key == terminal.TK_F:
         pc.fog_toggle = not pc.fog_toggle
-    elif key == blt.TK_S | blt.TK_KEY_RELEASED:
+    elif key == terminal.TK_S:
         pc.change_los()
-    elif key == blt.TK_R | blt.TK_KEY_RELEASED:
+    elif key == terminal.TK_R:
         world.generate_map(world.width, world.height, world.num_exits)
         pc.place(world.start_loc)
         world.register(pc)
+        pc.viewed_map = set()
 
 
 def initialize():
     global WINDOW_WIDTH, WINDOW_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT, CELLSIZE
-    blt.open_()
-    blt.set_("window: size={}x{}, cellsize={}, title='Roguelike';"
+    terminal.open()
+    terminal.set("window: size={}x{}, cellsize={}, title='Roguelike';"
              "font: default".format(
                  str(WINDOW_WIDTH), str(WINDOW_HEIGHT), CELLSIZE))
-    blt.clear()
-    blt.refresh()
-    blt.color("white")
-    random.seed(2)
+    terminal.clear()
+    terminal.refresh()
+    terminal.color("white")
+    # random.seed(2)
 
 
 def main():
@@ -246,15 +247,16 @@ def main():
         render(world, pc, offset)
 
         key = 0
-        while blt.has_input():
-            key = blt.read()
-            if key == blt.TK_CLOSE or key == blt.TK_Q:
+        while terminal.has_input():
+            key = terminal.read()
+            print(key)
+            if key == terminal.TK_CLOSE or key == terminal.TK_Q:
                 proceed = False
-            else:
-                process_input(key, world, pc)
+            # else:
+            #     process_input(key, world, pc)
 
     # if proceed is False, end the program
-    blt.close()
+    terminal.close()
 
 if __name__ == '__main__':
     main()
