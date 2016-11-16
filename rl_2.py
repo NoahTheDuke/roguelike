@@ -144,15 +144,13 @@ class GameEngine:
         for row in range(self.offset.top_edge, self.screen_height):
             for col in range(self.offset.left_edge, self.screen_width):
                 terminal.print_(col, row, '.')
+        terminal.print_(self.pc.x, self.pc.y, self.pc.glyph)
 
     def render_UI(self):
         pass
 
     def render_message_bar(self):
         pass
-
-    def pc_location(self):
-        return self.current_world.pc_location()
 
     def set_offset(self):
         """
@@ -164,14 +162,14 @@ class GameEngine:
         if self.pc.x < center_x:
             self.offset.left_edge = 0
         elif self.pc.x > self.current_world.width - center_x:
-            self.offset.left_edge = self.current_world.width - SCREEN_WIDTH
+            self.offset.left_edge = self.current_world.width - self.screen_width
         else:
             self.offset.left_edge = self.pc.x - center_x
 
         if self.pc.y < center_y:
             self.offset.top_edge = 0
         elif self.pc.y > self.current_world.height - center_y:
-            self.offset.top_edge = self.current_world.height - SCREEN_HEIGHT
+            self.offset.top_edge = self.current_world.height - self.screen_height
         else:
             self.offset.top_edge = self.pc.y - center_y
 
@@ -190,7 +188,21 @@ class GameEngine:
         pass
 
     def in_game_input(self, key):
-        pass
+        if key == terminal.TK_L:
+            self.move_pc(1, 0)
+        elif key == terminal.TK_K:
+            self.move_pc(0, -1)
+        elif key == terminal.TK_H:
+            self.move_pc(-1, 0)
+        elif key == terminal.TK_J:
+            self.move_pc(0, 1)
+
+    def move_pc(self, tx, ty):
+        dx, dy = self.pc.x + tx, self.pc.y + ty
+        if self.current_world.width > dx >= 0 and self.current_world.height > dy >= 0:
+            self.pc.x = dx
+            self.pc.y = dy
+            # pc.move(world, tx, ty)
 
     def cleanup(self):
         terminal.close()
