@@ -62,11 +62,14 @@ class GameEngine:
 
     def initialize_blt(self):
         terminal.open()
-        terminal.set("window: size={}x{}, cellsize={}, title='Roguelike';"
-                     "font: default; input: filter=[keyboard+]"
-                    "".format(str(self.window_width),
-                    str(self.window_height),
-                    self.cellsize))
+        terminal.set(
+            "window: size={}x{}, cellsize={}, title='Roguelike';"
+            "font: default;"
+            "input: filter=[keyboard+];"
+            "".format(
+                str(self.window_width),
+                str(self.window_height),
+                self.cellsize))
         terminal.clear()
         terminal.refresh()
         terminal.color("white")
@@ -188,21 +191,29 @@ class GameEngine:
         pass
 
     def in_game_input(self, key):
-        if key == terminal.TK_L:
+        key_released = (terminal.TK_KEY_RELEASED, 0)[terminal.check(terminal.TK_SHIFT)]
+        if key == terminal.TK_L | key_released:
             self.move_pc(1, 0)
-        elif key == terminal.TK_K:
-            self.move_pc(0, -1)
-        elif key == terminal.TK_H:
-            self.move_pc(-1, 0)
-        elif key == terminal.TK_J:
+        elif key == terminal.TK_N | key_released:
+            self.move_pc(1, 1)
+        elif key == terminal.TK_J | key_released:
             self.move_pc(0, 1)
+        elif key == terminal.TK_B | key_released:
+            self.move_pc(-1, 1)
+        elif key == terminal.TK_H | key_released:
+            self.move_pc(-1, 0)
+        elif key == terminal.TK_Y | key_released:
+            self.move_pc(-1, -1)
+        elif key == terminal.TK_K | key_released:
+            self.move_pc(0, -1)
+        elif key == terminal.TK_U | key_released:
+            self.move_pc(1, -1)
 
     def move_pc(self, tx, ty):
         dx, dy = self.pc.x + tx, self.pc.y + ty
         if self.current_world.width > dx >= 0 and self.current_world.height > dy >= 0:
             self.pc.x = dx
             self.pc.y = dy
-            # pc.move(world, tx, ty)
 
     def cleanup(self):
         terminal.close()
