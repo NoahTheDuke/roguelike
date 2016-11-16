@@ -1,9 +1,51 @@
 from time import perf_counter
 from collections import namedtuple
+from enum import IntEnum
+from collections.abc import Sequence
 import PyBearLibTerminal as terminal
 import random
 import yaml
-from Thing_2 import *
+
+class Game_States(IntEnum):
+    MAIN_MENU = 0
+    NEW_GAME = 1
+    IN_GAME = 2
+    OPTIONS = 3
+    HISTORY = 4
+
+class Thing:
+    def __init__(self, glyph, x, y):
+        self.glyph = glyph
+        self.x = x
+        self.y = y
+
+    def __str__(self):
+        return 'Thing: glyph={}, x={}, y={}'.format(self.glyph, self.x, self.y)
+
+class Map(Sequence):
+    def __init__(self, name, width, height, min_rooms, max_rooms):
+        self.name = name
+        self.width = width
+        self.height = height
+        self.min_rooms = min_rooms
+        self.max_rooms = max_rooms
+        self.layout = [[None for y in range(height)] for x in range(width)]
+
+    def __getitem__(self, key):
+        return self.layout[key]
+
+    def __len__(self):
+        return self.width * self.height
+
+    def __str__(self):
+        info = 'Map: name={}, width={}, height={}\n'.format(self.name, self.width, self.height)
+        pic = '\n'.join([str([' . ' * len(y)]) for y in self.layout])
+        return info + pic
+
+class Viewport:
+    def __init__(self, left_edge, top_edge):
+        self.left_edge = left_edge
+        self.top_edge = top_edge
 
 class GameEngine:
     def __init__(self):
@@ -14,38 +56,49 @@ class GameEngine:
         self.cellsize = "12x12"
         self.update_interval_ms = 0.033
         self.update_per_frame_limit = 10
-        self.offset = namedtuple('offset', 'x, y')
-        self.pc = None
+        self.offset = Viewport(0, 0)
         self.actors = []
+        self.state = Game_States.IN_GAME
 
     def initialize_blt(self):
         terminal.open()
         terminal.set("window: size={}x{}, cellsize={}, title='Roguelike';"
-                "font: default".format(
-                    str(self.window_width),
+                     "font: default; input: filter=[keyboard+]"
+                    "".format(str(self.window_width),
                     str(self.window_height),
                     self.cellsize))
         terminal.clear()
         terminal.refresh()
         terminal.color("white")
 
-    def generate_world(self):
+    def load_world_data(self):
         with open('data/world.yaml', 'r') as world_yaml:
-            self.world = [w for w in yaml.load_all(world_yaml)][0]
+            self.world_data = yaml.load(world_yaml)
 
     def generate_level(self, name):
+        current_level_data = self.world_data[name]
         try:
-            current_world = self.world[name]
+            self.current_world = Map(
+                name=current_level_data['name'],
+                width=current_level_data['width'],
+                height=current_level_data['height'],
+                min_rooms=current_level_data['min_rooms'],
+                max_rooms=current_level_data['max_rooms'],)
         except Exception as ex:
             print('you fucked up:', ex)
             return None
-        # self.current_world = Map(
-        #     name=current_world['name'],
-        #     width=current_world['width'],
-        #     height=current_world['height'],
-        #     min_rooms=current_world['min_rooms'],
-        #     max_rooms=current_world['max_rooms'],
-        #     num_exits=current_world['num_exits'],)
+        self.generate_player('human')
+
+    def generate_player(self, race):
+        with open('data/player.yaml', 'r') as player_yaml:
+            race_options = yaml.load(player_yaml)
+            self.races = race_options
+        chosen_race = race_options[race]
+        try:
+            self.pc = Thing(chosen_race['char'], 10, 10)
+        except Exception as ex:
+            print('you fucked up:', ex)
+            return None
 
     def run(self):
         UPDATE_INTERVAL_MS = self.update_interval_ms
@@ -67,20 +120,17 @@ class GameEngine:
                 self.update(time_elapsed, time_current)
                 next_update += UPDATE_INTERVAL_MS
             previous_time = perf_counter()
-
             self.render()
-
             if terminal.has_input():
                 key = terminal.read()
-                if key is terminal.TK_CLOSE or key is terminal.TK_Q:
-                    break
+                if key is terminal.TK_CLOSE:
+                    proceed = False
                 else:
-                    self.process_input(key)
+                    proceed = self.process_input(key)
 
     def update(self, time_elapsed, time_current):
         for actor in self.actors:
-            # actor.take_turn()
-            pass
+            actor.take_turn()
 
     def render(self):
         terminal.clear()
@@ -90,7 +140,10 @@ class GameEngine:
         terminal.refresh()
 
     def render_viewport(self):
-        self.find_offset()
+        self.set_offset()
+        for row in range(self.offset.top_edge, self.screen_height):
+            for col in range(self.offset.left_edge, self.screen_width):
+                terminal.print_(col, row, '.')
 
     def render_UI(self):
         pass
@@ -98,7 +151,10 @@ class GameEngine:
     def render_message_bar(self):
         pass
 
-    def find_offset(self):
+    def pc_location(self):
+        return self.current_world.pc_location()
+
+    def set_offset(self):
         """
         From: http://www.roguebasin.com/index.php?title=Scrolling_map
         """
@@ -106,21 +162,35 @@ class GameEngine:
         center_y = self.screen_height // 2
 
         if self.pc.x < center_x:
-            self.offset.x = 0
-        elif self.pc.x > world.width - center_x:
-            self.offset.x = world.width - SCREEN_WIDTH
+            self.offset.left_edge = 0
+        elif self.pc.x > self.current_world.width - center_x:
+            self.offset.left_edge = self.current_world.width - SCREEN_WIDTH
         else:
-            self.offset.x = self.pc.x - center_x
+            self.offset.left_edge = self.pc.x - center_x
 
         if self.pc.y < center_y:
-            self.offset.y = 0
-        elif self.pc.y > world.height - center_y:
-            self.offset.y = world.height - SCREEN_HEIGHT
+            self.offset.top_edge = 0
+        elif self.pc.y > self.current_world.height - center_y:
+            self.offset.top_edge = self.current_world.height - SCREEN_HEIGHT
         else:
-            self.offset.y = self.pc.y - center_y
+            self.offset.top_edge = self.pc.y - center_y
 
     def process_input(self, key):
-        print(key)
+        if key == terminal.TK_Q and terminal.check(terminal.TK_SHIFT):
+            return False
+        elif key == terminal.TK_ESCAPE:
+            return False
+        if self.state == Game_States.MAIN_MENU:
+            self.menu_input(key)
+        elif self.state == Game_States.IN_GAME:
+            self.in_game_input(key)
+        return True
+
+    def menu_input(self, key):
+        pass
+
+    def in_game_input(self, key):
+        pass
 
     def cleanup(self):
         terminal.close()
@@ -128,7 +198,7 @@ class GameEngine:
 if __name__ == "__main__":
     game = GameEngine()
     game.initialize_blt()
-    game.generate_world()
+    game.load_world_data()
     game.generate_level('debug')
     game.run()
     game.cleanup()
