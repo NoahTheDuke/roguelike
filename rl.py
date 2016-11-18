@@ -1,5 +1,5 @@
 import yaml
-from bearlibterminal import terminal
+import PyBearLibTerminal as terminal
 from Thing import Actor, Map, Game_States, COLOR
 from time import perf_counter
 import random
@@ -249,11 +249,10 @@ def main():
         key = 0
         while terminal.has_input():
             key = terminal.read()
-            print(key)
             if key == terminal.TK_CLOSE or key == terminal.TK_Q:
                 proceed = False
-            # else:
-            #     process_input(key, world, pc)
+            else:
+                process_input(key, world, pc)
 
     # if proceed is False, end the program
     terminal.close()
