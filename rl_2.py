@@ -1,5 +1,4 @@
 from time import perf_counter
-from collections import namedtuple
 from enum import IntEnum
 from collections.abc import Sequence
 import PyBearLibTerminal as terminal
@@ -22,6 +21,10 @@ class Thing:
     def __str__(self):
         return 'Thing: glyph={}, x={}, y={}'.format(self.glyph, self.x, self.y)
 
+class Tile:
+    def __init__(self):
+        self.glyph = '#'
+
 class Map(Sequence):
     def __init__(self, name, width, height, min_rooms, max_rooms):
         self.name = name
@@ -29,7 +32,7 @@ class Map(Sequence):
         self.height = height
         self.min_rooms = min_rooms
         self.max_rooms = max_rooms
-        self.layout = [[None for y in range(height)] for x in range(width)]
+        self.layout = [[Tile() for y in range(height)] for x in range(width)]
 
     def __getitem__(self, key):
         return self.layout[key]
@@ -144,10 +147,10 @@ class GameEngine:
 
     def render_viewport(self):
         self.set_offset()
-        for row in range(self.offset.top_edge, self.screen_height):
-            for col in range(self.offset.left_edge, self.screen_width):
-                terminal.print_(col, row, '.')
-        terminal.print_(self.pc.x, self.pc.y, self.pc.glyph)
+        for r_idx, row in enumerate(self.current_world):
+            for c_idx, tile in enumerate(row):
+                terminal.put(r_idx, c_idx, tile.glyph)
+        terminal.put(self.pc.x, self.pc.y, self.pc.glyph)
 
     def render_UI(self):
         pass
